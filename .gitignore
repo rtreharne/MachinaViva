@@ -1,0 +1,57 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Byte-compiled / optimized / DLL files
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# -------------------------
+# Django
+# -------------------------
+db.sqlite3
+media/
+staticfiles/
+
+# Local settings
+*.local.py
+
+# Logs
+*.log
+
+# -------------------------
+# Security
+# -------------------------
+# Private keys
+*.pem
+*.key
+
+# JWT / secrets
+*.jwt
+*.token
+
+# -------------------------
+# Environment files
+# -------------------------
+.env
+.env.*
+
+# -------------------------
+# Mac / Linux / Windows junk
+# -------------------------
+.DS_Store
+Thumb

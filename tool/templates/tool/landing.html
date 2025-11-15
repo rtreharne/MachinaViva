@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LTI1.3 Base</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: #fafafa;
+            color: #111;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            text-align: center;
+            padding: 60px 20px 20px;
+        }
+        h1 {
+            font-size: 2.4rem;
+            margin-bottom: 0.2em;
+        }
+        .subtle {
+            color: #666;
+        }
+        .card {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 6px 22px rgba(0,0,0,0.07);
+        }
+        footer {
+            text-align: center;
+            margin-top: 80px;
+            padding: 20px;
+            color: #777;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Django LTI1.3 Base</h1>
+    <p class="subtle">Minimalist Post-Launch Dashboard</p>
+</header>
+
+<div class="card">
+    <h2>Welcome, {{ user_name }}</h2>
+    <p class="subtle">Course: <strong>{{ course_name }}</strong></p>
+</div>
+
+<div class="card">
+    <h2>LTI Claims</h2>
+    <table style="width:100%; border-collapse: collapse; font-size: 0.95rem;">
+        <tbody>
+            {% for key, value in claims.items %}
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px 4px; font-weight: bold; width: 35%;">{{ key }}</td>
+                <td style="padding: 8px 4px; color: #444;">
+                    <pre style="margin: 0; white-space: pre-wrap;">{{ value|safe }}</pre>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<footer>
+    © {{ year }} Dr. Robert Treharne — All Rights Reserved
+</footer>
+
+</body>
+</html>
