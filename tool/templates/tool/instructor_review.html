@@ -1,0 +1,38 @@
+{% extends "tool/base.html" %}
+{% block content %}
+
+<h2>{{ assignment.title }}</h2>
+
+<div class="card">
+    <h3>Instructor Dashboard</h3>
+
+    <div class="button-group" style="margin-bottom: 20px;">
+        <a href="{% url 'assignment_edit' %}" class="button primary">
+            Edit Assignment Settings
+        </a>
+    </div>
+
+    <hr>
+
+    <h3>Student Submissions</h3>
+
+    {% if submissions %}
+        <ul class="submission-list">
+            {% for sub in submissions %}
+                <li class="submission-item">
+                    <strong>{{ sub.user_id }}</strong><br>
+                    <span class="timestamp">{{ sub.created_at|date:"Y-m-d H:i" }}</span>
+                    <pre class="submission-text">{{ sub.comment }}</pre>
+
+                    {% if sub.file %}
+                        <a class="file-link" href="{{ sub.file.url }}" download>Download file</a>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No submissions yet.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

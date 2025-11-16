@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-(zj*=p0e++sk^2!xm5jko_p6j^0ohrvpet)c9*#!4d(im-i)xg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "canvas.ninepointeightone.com", "app.ninepointeightone.com",]
 
 
 # Application definition
@@ -126,8 +126,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 import os
 
 # LTI settings
-LTI_CLIENT_ID = "10000000000006"
-LTI_DEPLOYMENT_ID = "10:f97330a96452fc363a34e0ef6d8d0d3e9e1007d2"
+LTI_CLIENT_ID = "10000000000008"
+LTI_DEPLOYMENT_ID = "16:8865aa05b4b79b64a91a86042e43af5ea8ae79eb"
 
 LTI_ISS = "https://canvas.instructure.com"  # Canvas uses this even in dev
 # LTI_PLATFORM_JWKS_URL = "http://canvas.docker/api/lti/security/jwks"
@@ -137,25 +137,28 @@ LTI_ISS = "https://canvas.instructure.com"  # Canvas uses this even in dev
 LTI_PLATFORM_JWKS_URL = "https://canvas.ninepointeightone.com/api/lti/security/jwks"
 LTI_AUTHORIZE_URL = "https://canvas.ninepointeightone.com/api/lti/authorize_redirect"
 
-LTI_TOOL_REDIRECT_URI = "http://localhost:8000/launch/"
+LTI_TOOL_REDIRECT_URI = "https://app.ninepointeightone.com/launch/"
 
-# Cookie settings so Firefox works in localhost (insecure ok for dev)
+# ------------------------------
+# LTI cookie settings (required)
+# ------------------------------
 SESSION_COOKIE_SAMESITE = None
-SESSION_COOKIE_SECURE = False        # must be False for non-HTTPS
-SESSION_COOKIE_DOMAIN = None  # critical for cross-site cookies
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_DOMAIN = None   # MUST be None for cross-site LTI
 
-CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = False
-
+CSRF_COOKIE_SAMESITE = None
+CSRF_COOKIE_SECURE = True
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://canvas.docker",
-    "https://canvas.docker",
-    "http://localhost:8000",
-    "http://canvas.ninepointeightone.com"
-    "https://canvas.ninepointeightone.com"
+    "https://canvas.ninepointeightone.com",
+    "https://app.ninepointeightone.com",
 ]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
-SESSION_COOKIE_DOMAIN = "localhost"
 X_FRAME_OPTIONS = "ALLOWALL"
+
+STATIC_URL = "/static/"
+
+STATICFILES_DIRS = [
+    BASE_DIR / "tool" / "static",
+]

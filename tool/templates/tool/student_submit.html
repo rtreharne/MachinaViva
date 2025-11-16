@@ -1,0 +1,30 @@
+{% extends "tool/base.html" %}
+{% block content %}
+
+<h2>{{ assignment.title }}</h2>
+
+{% if latest_submission %}
+    <div class="submission-box">
+        <h3>Your latest submission ({{ latest_submission.created_at|date:"Y-m-d H:i" }})</h3>
+        <pre class="submission-text">{{ latest_submission.comment }}</pre>
+    </div>
+
+    {% if assignment.allow_multiple_submissions %}
+        <p>You can submit again. Your latest submission will replace the previous one.</p>
+    {% else %}
+        <p class="locked-msg">This assignment only allows one submission. You cannot resubmit.</p>
+    {% endif %}
+{% else %}
+    <p>You haven't submitted anything yet.</p>
+{% endif %}
+
+{% if assignment.allow_multiple_submissions or not latest_submission %}
+<form action="{% url 'submit_text' %}" method="POST" class="submission-form">
+    {% csrf_token %}
+    <label for="text">Your submission:</label>
+    <textarea id="text" name="text" required></textarea>
+    <button type="submit">Submit</button>
+</form>
+{% endif %}
+
+{% endblock %}

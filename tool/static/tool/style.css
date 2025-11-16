@@ -1,0 +1,93 @@
+:root {
+    --bg: #f8f9fb;
+    --card-bg: #ffffff;
+    --text: #1f1f1f;
+    --subtle-text: #666;
+    --primary: #1976d2;
+    --primary-hover: #145ca8;
+    --border: #e3e6eb;
+    --radius: 12px;
+}
+
+/* Base Layout */
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+header {
+    text-align: center;
+    padding: 40px 20px 10px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.subtle {
+    color: var(--subtle-text);
+    font-size: 14px;
+    margin-top: 6px;
+}
+
+.container {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+}
+
+.card {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    margin-top: 32px;
+}
+
+/* Buttons */
+button,
+.button {
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+button:hover,
+.button:hover {
+    background: var(--primary-hover);
+}
+
+/* Forms */
+label {
+    margin-top: 16px;
+    display: block;
+    font-weight: 600;
+}
+
+input,
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    margin-top: 8px;
+    box-sizing: border-box;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 40px;
+    font-size: 13px;
+    color: var(--subtle-text);
+}

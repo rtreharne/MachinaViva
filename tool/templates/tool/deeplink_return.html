@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Returning to Canvas…</title>
+</head>
+<body onload="document.forms[0].submit()">
+
+<form action="{{ return_url }}" method="POST">
+    <input type="hidden" name="JWT" value="{{ jwt }}">
+</form>
+
+<p style="font-family: system-ui, sans-serif; font-size:14px; color:#666; text-align:center; margin-top:40px;">
+    Returning to Canvas…
+</p>
+
+</body>
+</html>

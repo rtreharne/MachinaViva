@@ -1,0 +1,56 @@
+{% extends "tool/base.html" %}
+{% block content %}
+
+<div class="card">
+
+    {% if edit_mode %}
+        <h2>Edit Assignment Settings</h2>
+        <p>Update the settings for this assignment. These changes will be reflected in Canvas.</p>
+    {% else %}
+        <h2>Create Assignment in Canvas</h2>
+        <p>Configure the assignment before inserting it into Canvas.</p>
+    {% endif %}
+
+    <form method="POST"
+          action="{% if edit_mode %}{% url 'deeplink_edit_submit' %}{% else %}{% url 'deeplink_submit' %}{% endif %}">
+        {% csrf_token %}
+
+        <input type="hidden" name="return_url" value="{{ deep_link_return }}">
+
+        <div class="form-field">
+            <label for="title">Title</label>
+            <input id="title" name="title"
+                   value="{% if edit_mode %}{{ assignment.title }}{% else %}Viva Assignment{% endif %}"
+                   required>
+        </div>
+
+        <div class="form-field">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="4">{% if edit_mode %}{{ assignment.description }}{% endif %}</textarea>
+        </div>
+
+        <div class="form-field">
+            <label for="allow_multiple">Allow multiple submissions?</label>
+            <select id="allow_multiple" name="allow_multiple">
+                {% if edit_mode %}
+                    <option value="false" {% if not assignment.allow_multiple_submissions %}selected{% endif %}>No</option>
+                    <option value="true" {% if assignment.allow_multiple_submissions %}selected{% endif %}>Yes</option>
+                {% else %}
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                {% endif %}
+            </select>
+        </div>
+
+        <button type="submit" class="button primary" style="margin-top: 20px;">
+            {% if edit_mode %}
+                Save Changes
+            {% else %}
+                Create Assignment
+            {% endif %}
+        </button>
+
+    </form>
+</div>
+
+{% endblock %}

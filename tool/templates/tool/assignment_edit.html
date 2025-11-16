@@ -1,0 +1,31 @@
+{% extends "tool/base.html" %}
+{% block content %}
+
+<h2>Edit Assignment Settings</h2>
+
+<div class="card">
+
+    <form method="POST" action="{% url 'assignment_edit_save' %}">
+        {% csrf_token %}
+
+        <label for="title">Title</label>
+        <input id="title" name="title" value="{{ assignment.title }}" required>
+
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="4">{{ assignment.description }}</textarea>
+
+        <label for="allow_multiple">
+            <input type="checkbox" id="allow_multiple" name="allow_multiple"
+                   {% if assignment.allow_multiple_submissions %}checked{% endif %}>
+            Allow multiple submissions
+        </label>
+
+        <button type="submit" class="button" style="margin-top: 20px;">
+            Save Changes
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Viva Tool{% endblock %}</title>
+
+    <link rel="stylesheet" href="{% static 'tool/style.css' %}">
+</head>
+
+<body>
+
+<header>
+    <h1>{% block header %}LTI Tool{% endblock %}</h1>
+    <p class="subtle">{% block subtitle %}{% endblock %}</p>
+</header>
+
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+
+<div class="footer">
+    © {{ year }} Fizzy Newt Solutions Tools — All Rights Reserved
+</div>
+
+</body>
+</html>
