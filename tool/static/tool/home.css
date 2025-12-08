@@ -258,6 +258,8 @@ a {
     border: 1px solid var(--border);
     border-radius: 18px;
     padding: 18px;
+    max-width: 100%;
+    overflow: hidden; /* prevent child overflow from widening on mobile */
     box-shadow: var(--shadow);
     backdrop-filter: blur(18px);
     display: flex;
@@ -317,9 +319,13 @@ a {
 .panel-chat {
     height: 240px;
     overflow-y: auto;
+    overflow-x: hidden; /* keep wide code from pushing the column */
     padding-right: 4px;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    min-width: 0; /* allow children to shrink within the panel */
+    max-width: 100%;
+    align-items: stretch;
 }
 
 .lang-switch {
@@ -397,27 +403,33 @@ a {
     border-radius: 12px;
     line-height: 1.5;
     font-size: 0.97rem;
+    min-width: 0; /* prevent long code from forcing the chat column wider */
+    max-width: 100%;
     opacity: 0;
     transform: translateY(6px);
     animation: fadeSlide 0.35s ease forwards;
 }
 
-.bubble code,
-.bubble pre {
+.panel-chat > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.bubble code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 10px 12px;
-    display: block;
+    padding: 8px 10px;
+    display: inline-block;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     color: #e5e7eb;
-    margin: 10px 0 4px;
-    white-space: pre;
-    overflow-x: auto;
-}
-
-.bubble pre {
-    margin: 12px 0 6px;
+    margin: 6px 0 2px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .rating-bubble {

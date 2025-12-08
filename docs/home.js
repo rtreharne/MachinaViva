@@ -374,8 +374,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const parts = (text || "").split(/```([\s\S]*?)```/g);
         for (let i = 0; i < parts.length; i++) {
             if (i % 2 === 1) {
-                // code segment
-                segments.push(`<pre><code>${escapeHtml(parts[i].trim())}</code></pre>`);
+                // code segment rendered inline to avoid resizing the chat on mobile
+                const code = escapeHtml(parts[i].trim()).replace(/\n/g, "<br>");
+                segments.push(`<code class="inline-code">${code}</code>`);
             } else if (parts[i]) {
                 segments.push(escapeHtml(parts[i]).replace(/\n/g, "<br>"));
             }
