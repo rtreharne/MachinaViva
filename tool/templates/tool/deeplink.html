@@ -1,56 +1,235 @@
-{% extends "tool/base.html" %}
-{% block content %}
+{% load static %}
+{% now "U" as cachebust %}
+{% now "Y" as year %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MachinaViva | Create Assignment</title>
+    <link rel="stylesheet" href="{% static 'tool/home.css' %}?v={{ cachebust }}">
+</head>
+<body>
+<div class="page">
 
-<div class="card">
+    <header class="nav">
+        <div class="brand">
+            <span class="brand-mark">MV</span>
+            <span>MachinaViva</span>
+        </div>
+        <div class="nav-title">Create assignment</div>
+        <div class="nav-actions">
+            <button class="view-btn ghost" type="button" data-theme-toggle aria-label="Toggle theme">Light</button>
+        </div>
+    </header>
 
-    {% if edit_mode %}
-        <h2>Edit Assignment Settings</h2>
-        <p>Update the settings for this assignment. These changes will be reflected in Canvas.</p>
-    {% else %}
-        <h2>Create Assignment in Canvas</h2>
-        <p>Configure the assignment before inserting it into Canvas.</p>
-    {% endif %}
-
-    <form method="POST"
-          action="{% if edit_mode %}{% url 'deeplink_edit_submit' %}{% else %}{% url 'deeplink_submit' %}{% endif %}">
-        {% csrf_token %}
-
-        <input type="hidden" name="return_url" value="{{ deep_link_return }}">
-
-        <div class="form-field">
-            <label for="title">Title</label>
-            <input id="title" name="title"
-                   value="{% if edit_mode %}{{ assignment.title }}{% else %}Viva Assignment{% endif %}"
-                   required>
+    <section class="section dash-compact">
+        <div class="section-head compact">
+            <div>
+                <p class="eyebrow">Deep linking</p>
+                <h2>Configure your MachinaViva assignment</h2>
+                <p class="meta">These settings can be adjusted later in the Viva settings page.</p>
+            </div>
         </div>
 
-        <div class="form-field">
-            <label for="description">Description</label>
-            <textarea id="description" name="description" rows="4">{% if edit_mode %}{{ assignment.description }}{% endif %}</textarea>
-        </div>
+        <form method="POST"
+              action="{% if edit_mode %}{% url 'deeplink_edit_submit' %}{% else %}{% url 'deeplink_submit' %}{% endif %}"
+              class="settings-grid max-two"
+              novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="return_url" value="{{ deep_link_return }}">
 
-        <div class="form-field">
-            <label for="allow_multiple">Allow multiple submissions?</label>
-            <select id="allow_multiple" name="allow_multiple">
-                {% if edit_mode %}
-                    <option value="false" {% if not assignment.allow_multiple_submissions %}selected{% endif %}>No</option>
-                    <option value="true" {% if assignment.allow_multiple_submissions %}selected{% endif %}>Yes</option>
-                {% else %}
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                {% endif %}
-            </select>
-        </div>
+            <div class="settings-form-card">
+                <div class="settings-card-head">
+                    <h3 class="settings-title">Overview</h3>
+                </div>
+                <div class="settings-row">
+                    <label for="title">Assignment title</label>
+                    <input id="title" name="title"
+                           value="{% if edit_mode %}{{ assignment.title }}{% else %}Viva Assignment{% endif %}"
+                           required>
+                </div>
+                <div class="settings-row">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="3" placeholder="Short summary for staff and students.">{% if edit_mode %}{{ assignment.description }}{% endif %}</textarea>
+                </div>
+                <div class="settings-row split">
+                    <div>
+                        <label for="viva_duration_minutes">Duration</label>
+                        <input type="number" id="viva_duration_minutes" name="viva_duration_minutes" min="1" step="1" value="{% if edit_mode %}{{ duration_minutes|default:default_duration_minutes }}{% else %}{{ default_duration_minutes }}{% endif %}">
+                    </div>
+                    <div>
+                        <label for="max_attempts">Attempts</label>
+                        <input type="number" id="max_attempts" name="max_attempts" min="1" max="5" step="1" value="{% if edit_mode %}{{ assignment.max_attempts|default_if_none:default_max_attempts }}{% else %}{{ default_max_attempts }}{% endif %}" {% if edit_mode %}{% if not assignment.max_attempts or assignment.max_attempts <= 0 %}disabled{% endif %}{% endif %}>
+                        <div class="unlimited-toggle">
+                            <span class="meta">Unlimited</span>
+                            <label class="switch">
+                                <input type="checkbox" id="unlimited_attempts" name="unlimited_attempts" {% if edit_mode %}{% if not assignment.max_attempts or assignment.max_attempts <= 0 %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="viva_tone">Tone</label>
+                        <select id="viva_tone" name="viva_tone">
+                            {% for tone in tones %}
+                                <option value="{{ tone }}" {% if edit_mode %}{% if assignment.viva_tone == tone %}selected{% endif %}{% else %}{% if tone == default_viva_tone %}selected{% endif %}{% endif %}>{{ tone }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row split">
+                    <div>
+                        <label for="feedback_visibility">Feedback visibility</label>
+                        <select id="feedback_visibility" name="feedback_visibility">
+                            <option value="immediate" {% if edit_mode %}{% if assignment.feedback_visibility == "immediate" %}selected{% endif %}{% else %}{% if default_feedback_visibility == "immediate" %}selected{% endif %}{% endif %}>Show immediately</option>
+                            <option value="after_review" {% if edit_mode %}{% if assignment.feedback_visibility == "after_review" %}selected{% endif %}{% else %}{% if default_feedback_visibility == "after_review" %}selected{% endif %}{% endif %}>After teacher review</option>
+                            <option value="hidden" {% if edit_mode %}{% if assignment.feedback_visibility == "hidden" %}selected{% endif %}{% else %}{% if default_feedback_visibility == "hidden" %}selected{% endif %}{% endif %}>Hide</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label>Student report</label>
+                    <div class="tracking-table">
+                        <div class="tracking-item">
+                            <div>
+                                <div class="tracking-label">Download feedback/transcript</div>
+                                <div class="meta">Allow students to export their session.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="allow_student_report" {% if edit_mode %}{% if assignment.allow_student_report %}checked{% endif %}{% else %}{% if default_allow_student_report %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="tracking-item">
+                            <div>
+                                <div class="tracking-label">Enable model answers</div>
+                                <div class="meta">Show exemplar answers after completion.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="enable_model_answers" {% if edit_mode %}{% if assignment.enable_model_answers %}checked{% endif %}{% else %}{% if default_enable_model_answers %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="tracking-item">
+                            <div>
+                                <div class="tracking-label">Allow students to toggle instructor files</div>
+                                <div class="meta">Students must include at least one file.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="allow_student_resource_toggle" {% if edit_mode %}{% if assignment.allow_student_resource_toggle %}checked{% endif %}{% else %}{% if default_allow_student_resource_toggle %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label>Tracking</label>
+                    <div class="tracking-table">
+                        <div class="tracking-item">
+                            <div>
+                                <div class="tracking-label">Event tracking</div>
+                                <div class="meta">Paste, blur/focus, window changes.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="event_tracking" {% if edit_mode %}{% if assignment.event_tracking %}checked{% endif %}{% else %}{% if default_event_tracking %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="tracking-item">
+                            <div>
+                                <div class="tracking-label">Keystroke tracking</div>
+                                <div class="meta">Pacing signals.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="keystroke_tracking" {% if edit_mode %}{% if assignment.keystroke_tracking %}checked{% endif %}{% else %}{% if default_keystroke_tracking %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="tracking-item">
+                            <div>
+                                <div class="tracking-label">Arrhythmic typing</div>
+                                <div class="meta">Flag irregular bursts.</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="arrhythmic_typing" {% if edit_mode %}{% if assignment.arrhythmic_typing %}checked{% endif %}{% else %}{% if default_arrhythmic_typing %}checked{% endif %}{% endif %}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        <button type="submit" class="button primary" style="margin-top: 20px;">
-            {% if edit_mode %}
-                Save Changes
-            {% else %}
-                Create Assignment
-            {% endif %}
-        </button>
+            <div class="settings-form-card">
+                <div class="settings-card-head">
+                    <h3 class="settings-title">Tone & guidance</h3>
+                </div>
+                <div class="settings-row">
+                    <label for="viva_instructions">Core viva instructions</label>
+                    <textarea id="viva_instructions" name="viva_instructions" rows="4" placeholder="How should the AI conduct the viva? Tone, strictness, what to probe, what to avoid.">{% if edit_mode %}{{ assignment.viva_instructions }}{% endif %}</textarea>
+                </div>
+                <div class="settings-row">
+                    <label for="additional_prompts">Additional prompts</label>
+                    <textarea id="additional_prompts" name="additional_prompts" rows="3" placeholder="Any bespoke prompts or discipline-specific instructions.">{% if edit_mode %}{{ assignment.additional_prompts }}{% endif %}</textarea>
+                </div>
+                <div class="settings-row">
+                    <label for="instructor_notes">Instructor notes (private)</label>
+                    <textarea id="instructor_notes" name="instructor_notes" rows="3" placeholder="Private notes about this viva.">{% if edit_mode %}{{ assignment.instructor_notes }}{% endif %}</textarea>
+                </div>
+            </div>
 
-    </form>
+            <div class="settings-actions">
+                <button class="control-btn primary" type="submit">
+                    {% if edit_mode %}Save changes{% else %}Create assignment{% endif %}
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <footer class="footer">
+        <p>© {{ year }} MachinaViva · Authentic viva assessments for the AI era.</p>
+    </footer>
 </div>
 
-{% endblock %}
+<script>
+    (() => {
+        const unlimited = document.getElementById("unlimited_attempts");
+        const attempts = document.getElementById("max_attempts");
+        if (!unlimited || !attempts) return;
+        const toggle = () => {
+            attempts.disabled = unlimited.checked;
+            if (unlimited.checked) {
+                attempts.value = 0;
+            } else if (!attempts.value || Number(attempts.value) < 1) {
+                attempts.value = 1;
+            }
+        };
+        unlimited.addEventListener("change", toggle);
+        toggle();
+    })();
+</script>
+<script>
+    (() => {
+        const themeToggle = document.querySelector("[data-theme-toggle]");
+        if (!themeToggle) return;
+        const root = document.documentElement;
+        const applyTheme = (mode) => {
+            if (mode === "light") {
+                root.setAttribute("data-theme", "light");
+                themeToggle.textContent = "Dark";
+            } else {
+                root.setAttribute("data-theme", "dark");
+                themeToggle.textContent = "Light";
+            }
+            localStorage.setItem("mv-theme", mode);
+        };
+        const saved = localStorage.getItem("mv-theme");
+        applyTheme(saved === "light" ? "light" : "dark");
+        themeToggle.addEventListener("click", () => {
+            const current = root.getAttribute("data-theme") === "light" ? "light" : "dark";
+            applyTheme(current === "light" ? "dark" : "light");
+        });
+    })();
+</script>
+</body>
+</html>

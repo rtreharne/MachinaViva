@@ -21,6 +21,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const previewModal = document.querySelector("[data-preview-modal]");
     const previewContent = document.querySelector("[data-preview-content]");
     const previewClose = document.querySelector("[data-preview-close]");
+    const resourceCard = document.querySelector("[data-resource-upload]");
+    const resourceList = document.querySelector("[data-resource-list]");
+    const resourceUploadForm = document.querySelector("[data-resource-upload-form]");
+    const resourceUploadInput = resourceUploadForm?.querySelector("[data-resource-upload-input]");
+    const resourceUploadBtn = resourceUploadForm?.querySelector("[data-resource-upload-btn]");
+    const resourceUploadHint = document.querySelector("[data-resource-upload-hint]");
+    const resourceUploadUrl = resourceUploadForm?.dataset.uploadUrl;
+    const resourceEmpty = document.querySelector("[data-resource-empty]");
     const backBtn = document.querySelector("[data-transcript-back]");
     const backToTop = document.querySelector("[data-back-to-top]");
     const themeToggle = document.querySelector("[data-theme-toggle]");
@@ -105,6 +113,198 @@ document.addEventListener("DOMContentLoaded", () => {
             default:
                 return `Event: ${type}`;
         }
+    };
+
+    const bindPreviewLink = (link) => {
+        if (!link) return;
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (!previewModal || !previewContent) return;
+            previewContent.textContent = (link.dataset.previewText || "").replace(/\\u([\dA-Fa-f]{4})/g, (_, code) =>
+                String.fromCharCode(parseInt(code, 16))
+            );
+            previewModal.classList.add("show");
+        });
+    };
+
+    const setResourceHint = (msg) => {
+        if (!resourceUploadHint) return;
+        if (msg) {
+            resourceUploadHint.textContent = msg;
+            resourceUploadHint.classList.remove("is-hidden");
+        } else {
+            resourceUploadHint.textContent = "";
+            resourceUploadHint.classList.add("is-hidden");
+        }
+    };
+
+    const getResourceRows = () => resourceList ? Array.from(resourceList.querySelectorAll("[data-resource-id]")) : [];
+
+    const recalcResourceTotals = () => {
+        if (!resourceUploadForm) return { count: 0, size: 0 };
+        const rows = getResourceRows();
+        const count = rows.length;
+        rows.forEach((row, idx) => {
+            row.classList.toggle("row-alt", idx % 2 === 1);
+        });
+        const size = rows.reduce((acc, row) => {
+            const sizeVal = parseInt(row.dataset.fileSize || "0", 10);
+            return acc + (Number.isFinite(sizeVal) ? sizeVal : 0);
+        }, 0);
+        resourceUploadForm.dataset.existingCount = String(count);
+        resourceUploadForm.dataset.existingSize = String(size);
+        if (resourceEmpty) {
+            resourceEmpty.classList.toggle("is-hidden", count > 0);
+        }
+        return { count, size };
+    };
+
+    const validateResourceSelection = () => {
+        if (!resourceUploadInput || !resourceUploadForm || !resourceUploadBtn) return true;
+        const maxFilesTotal = 10;
+        const maxTotalBytes = 50 * 1024 * 1024;
+        const existingCount = parseInt(resourceUploadForm.dataset.existingCount || "0", 10) || 0;
+        const existingSize = parseInt(resourceUploadForm.dataset.existingSize || "0", 10) || 0;
+        const files = resourceUploadInput.files || [];
+        let selectedSize = 0;
+        Array.from(files).forEach((f) => {
+            selectedSize += f?.size || 0;
+        });
+        const totalCount = existingCount + files.length;
+        const totalSize = existingSize + selectedSize;
+        const overCount = totalCount > maxFilesTotal;
+        const overSize = totalSize > maxTotalBytes;
+        resourceUploadBtn.disabled = overCount || overSize || files.length === 0;
+        if (overCount || overSize) {
+            const parts = [];
+            if (overCount) parts.push(`You can upload up to ${maxFilesTotal} files in total.`);
+            if (overSize) parts.push("Combined size limit is 50MB.");
+            setResourceHint(parts.join(" "));
+        } else {
+            setResourceHint("");
+        }
+        return !(overCount || overSize);
+    };
+
+    const toggleResourceInclude = async (resourceId, included) => {
+        if (!resourceId) return;
+        try {
+            await fetch(`/assignment/resources/${resourceId}/toggle/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({ resource_id: resourceId, included }),
+            });
+        } catch (err) {
+            console.warn("Failed to toggle resource", err);
+        }
+    };
+
+    const deleteResource = async (row, resourceId) => {
+        if (!resourceId) return;
+        try {
+            const res = await fetch(`/assignment/resources/${resourceId}/delete/`, {
+                method: "POST",
+                headers: { "Accept": "application/json" },
+                credentials: "same-origin",
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "Unable to delete resource");
+            }
+            row?.remove();
+            recalcResourceTotals();
+            validateResourceSelection();
+        } catch (err) {
+            console.warn("Delete failed", err);
+        }
+    };
+
+    const bindResourceRow = (row) => {
+        if (!row) return;
+        const resourceId = row.dataset.resourceId;
+        const toggle = row.querySelector("[data-resource-include]");
+        const deleteBtn = row.querySelector("[data-delete-resource]");
+        const preview = row.querySelector(".file-preview");
+        if (toggle) {
+            toggle.addEventListener("change", () => {
+                const included = !!toggle.checked;
+                row.dataset.included = included ? "1" : "0";
+                toggleResourceInclude(resourceId, included);
+            });
+        }
+        if (deleteBtn) {
+            deleteBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                deleteResource(row, resourceId);
+            });
+        }
+        if (preview) {
+            bindPreviewLink(preview);
+        }
+    };
+
+    const appendResourceRow = (resource) => {
+        if (!resourceList || !resource) return;
+        const body = resourceList.querySelector(".submission-table-body");
+        if (!body) return;
+        const row = document.createElement("div");
+        row.className = "submission-row";
+        row.dataset.resourceId = resource.id;
+        row.dataset.included = resource.included ? "1" : "0";
+        row.dataset.fileName = resource.file_name || "Uploaded file";
+        row.dataset.comment = resource.comment || "";
+        row.dataset.fileSize = resource.file_size || 0;
+        const fileCell = document.createElement("div");
+        fileCell.className = "submission-cell file-name";
+        const fileName = document.createElement("div");
+        fileName.textContent = String(resource.file_name || "Uploaded file")
+            .replace(/^assignment_resources\//, "")
+            .slice(0, 40);
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const preview = document.createElement("a");
+        preview.href = "#";
+        preview.className = "link file-preview";
+        preview.textContent = "Preview text";
+        preview.dataset.previewText = resource.comment || "";
+        meta.appendChild(preview);
+        fileCell.appendChild(fileName);
+        fileCell.appendChild(meta);
+
+        const includeCell = document.createElement("div");
+        includeCell.className = "submission-cell";
+        const toggleLabel = document.createElement("label");
+        toggleLabel.className = "slider-toggle";
+        toggleLabel.setAttribute("aria-label", "Include in viva");
+        const toggleInput = document.createElement("input");
+        toggleInput.type = "checkbox";
+        toggleInput.dataset.resourceInclude = "";
+        if (resource.included) toggleInput.checked = true;
+        const track = document.createElement("span");
+        track.className = "slider-track";
+        const thumb = document.createElement("span");
+        thumb.className = "slider-thumb";
+        track.appendChild(thumb);
+        toggleLabel.appendChild(toggleInput);
+        toggleLabel.appendChild(track);
+        includeCell.appendChild(toggleLabel);
+
+        const actionsCell = document.createElement("div");
+        actionsCell.className = "submission-cell submission-actions";
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "icon-btn danger";
+        deleteBtn.type = "button";
+        deleteBtn.dataset.deleteResource = resource.id;
+        deleteBtn.textContent = "Delete";
+        actionsCell.appendChild(deleteBtn);
+
+        row.appendChild(fileCell);
+        row.appendChild(includeCell);
+        row.appendChild(actionsCell);
+        body.prepend(row);
+        bindResourceRow(row);
+        recalcResourceTotals();
     };
 
     const buildEventTimeline = (events = []) => {
@@ -218,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const name = document.createElement("span");
             name.className = "file-chip-name";
-            name.textContent = (file.file_name || "").replace(/^submissions\//, "");
+            name.textContent = (file.file_name || "").replace(/^(submissions|assignment_resources)\//, "");
             chip.appendChild(name);
 
             const preview = document.createElement("a");
@@ -474,7 +674,10 @@ document.addEventListener("DOMContentLoaded", () => {
             saveTimeout = setTimeout(runSave, 800);
         };
 
-        const markDirty = () => {
+        const markDirty = (event) => {
+            if (event?.target && event.target.closest("[data-resource-upload]")) {
+                return;
+            }
             dirty = true;
             if (saveStatus) saveStatus.textContent = "Saving…";
             scheduleSave();
@@ -483,6 +686,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const runSave = async () => {
             if (!dirty) return;
             const formData = new FormData(settingsForm);
+            formData.delete("file");
             try {
                 const resp = await fetch(settingsForm.action, {
                     method: "POST",
@@ -516,6 +720,50 @@ document.addEventListener("DOMContentLoaded", () => {
         settingsForm.addEventListener("submit", (e) => {
             e.preventDefault();
             markDirty();
+        });
+    }
+
+    if (resourceList) {
+        getResourceRows().forEach(bindResourceRow);
+        recalcResourceTotals();
+    }
+
+    if (resourceUploadInput) {
+        resourceUploadInput.addEventListener("change", validateResourceSelection);
+        validateResourceSelection();
+    }
+
+    if (resourceUploadBtn) {
+        resourceUploadBtn.addEventListener("click", async () => {
+            if (!resourceUploadInput || !resourceUploadUrl) return;
+            if (!validateResourceSelection()) return;
+            const files = resourceUploadInput.files || [];
+            if (!files.length) {
+                setResourceHint("Select at least one file to upload.");
+                return;
+            }
+            const formData = new FormData();
+            Array.from(files).forEach((file) => formData.append("file", file));
+            try {
+                const res = await fetch(resourceUploadUrl, {
+                    method: "POST",
+                    headers: { "Accept": "application/json" },
+                    credentials: "same-origin",
+                    body: formData,
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || data?.status !== "ok") {
+                    const msg = data?.message || "Upload failed";
+                    setResourceHint(msg);
+                    return;
+                }
+                (data.resources || []).forEach(appendResourceRow);
+                resourceUploadInput.value = "";
+                validateResourceSelection();
+            } catch (err) {
+                console.warn("Upload failed", err);
+                setResourceHint("Upload failed. Please try again.");
+            }
         });
     }
 

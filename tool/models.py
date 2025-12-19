@@ -44,6 +44,8 @@ class Assignment(models.Model):
     keystroke_tracking = models.BooleanField(default=True)
     event_tracking = models.BooleanField(default=True)
     arrhythmic_typing = models.BooleanField(default=True)
+    enable_model_answers = models.BooleanField(default=True)
+    allow_student_resource_toggle = models.BooleanField(default=False)
 
 
     def __str__(self):
@@ -56,12 +58,25 @@ class Submission(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to="submissions/")
     comment = models.TextField(blank=True)
+    is_placeholder = models.BooleanField(default=False)
 
     # Optional: store grade if using AGS later
     grade = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user_id} → {self.assignment.title}"
+
+
+class AssignmentResource(models.Model):
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name="resources")
+    file = models.FileField(upload_to="assignment_resources/")
+    comment = models.TextField(blank=True)
+    included = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        file_name = self.file.name if self.file else "resource"
+        return f"{self.assignment.title} → {file_name}"
     
 class VivaSession(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name="viva_sessions")
@@ -79,6 +94,7 @@ class VivaMessage(models.Model):
     session = models.ForeignKey(VivaSession, on_delete=models.CASCADE)
     sender = models.CharField(max_length=20)  # "student" or "ai"
     text = models.TextField()
+    model_answer = models.TextField(blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
 
@@ -89,6 +105,15 @@ class VivaSessionSubmission(models.Model):
 
     class Meta:
         unique_together = ("session", "submission")
+
+
+class VivaSessionResource(models.Model):
+    session = models.ForeignKey(VivaSession, on_delete=models.CASCADE, related_name="resource_links")
+    resource = models.ForeignKey(AssignmentResource, on_delete=models.CASCADE, related_name="session_links")
+    included = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("session", "resource")
 
 
 class InteractionLog(models.Model):

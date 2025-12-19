@@ -45,9 +45,12 @@
      data-attempts-used="{{ attempts_used|default:0 }}"
      data-feedback-visibility="{{ assignment.feedback_visibility|default:'immediate' }}"
      data-unlimited-attempts="{% if assignment.max_attempts and assignment.max_attempts > 0 %}false{% else %}true{% endif %}"
+     data-config-files-included="{% if config_files_included %}true{% else %}false{% endif %}"
      data-event-tracking="{% if assignment.event_tracking %}true{% else %}false{% endif %}"
      data-keystroke-tracking="{% if assignment.keystroke_tracking %}true{% else %}false{% endif %}"
-     data-arrhythmic-typing="{% if assignment.arrhythmic_typing %}true{% else %}false{% endif %}">
+     data-arrhythmic-typing="{% if assignment.arrhythmic_typing %}true{% else %}false{% endif %}"
+     data-model-answers-enabled="{% if assignment.enable_model_answers %}true{% else %}false{% endif %}"
+     data-instructor-toggle-enabled="{% if assignment.allow_student_resource_toggle %}true{% else %}false{% endif %}">
 
     <header class="nav">
         <div class="brand">
@@ -137,6 +140,57 @@
                 </div>
 
                 <div class="settings-row">
+                    <label>Viva files (instructor)</label>
+                    <div class="submission-table-wrap" data-instructor-resources>
+                        <div class="submission-table-header">
+                            <span>File</span>
+                            <span>Include</span>
+                            <span>Actions</span>
+                        </div>
+                        <div class="submission-table-body">
+                            {% for resource in assignment_resources %}
+                                <div class="submission-row {% cycle 'row-alt' '' %}"
+                                     data-instructor-resource
+                                     data-resource-id="{{ resource.id }}"
+                                     data-included="{{ resource.included|yesno:'1,0' }}"
+                                     data-file-name="{{ resource.file_name|cut:'assignment_resources/'|default:'uploaded file' }}"
+                                     data-comment="{{ resource.comment|default_if_none:''|escapejs }}"
+                                     data-file-size="{{ resource.file_size|default:0 }}">
+                                    <div class="submission-cell file-name">
+                                        {{ resource.file_name|cut:"assignment_resources/"|default:"uploaded file"|truncatechars:40 }}
+                                        <div class="meta">
+                                            <a class="link file-preview"
+                                               href="#"
+                                               data-preview-text="{{ resource.comment|default_if_none:''|escapejs }}">
+                                                Preview text
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="submission-cell">
+                                        <label class="slider-toggle" aria-label="Included in viva">
+                                            <input type="checkbox" data-instructor-include {% if resource.included %}checked{% endif %} {% if not assignment.allow_student_resource_toggle %}disabled{% endif %}>
+                                            <span class="slider-track">
+                                                <span class="slider-thumb"></span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div class="submission-cell submission-actions">
+                                        {% if assignment.allow_student_resource_toggle %}
+                                            <span class="meta muted">Toggle to include</span>
+                                        {% else %}
+                                            <span class="meta muted">Managed by instructor</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="meta {% if assignment_resources %}is-hidden{% endif %}">
+                        No instructor files yet.
+                    </div>
+                </div>
+
+                <div class="settings-row">
                     <label>Your uploads</label>
                     {% if submission_payloads %}
                         <div class="submission-table-wrap" data-submission-list {% if session %}data-active-session="{{ session.id }}"{% endif %}>
@@ -213,7 +267,10 @@
             <div class="settings-form-card is-hidden" data-viva-chat-card>
                 <div class="settings-card-head">
                     <h3 class="settings-title">Viva chat</h3>
-                    <button class="control-btn ghost" type="button" data-back-dashboard>Back</button>
+                    <div class="viva-head-actions">
+                        <button class="control-btn ghost is-hidden" type="button" data-toggle-model>Show model answers</button>
+                        <button class="control-btn ghost" type="button" data-back-dashboard>Back</button>
+                    </div>
                 </div>
                 <div class="viva-chat-card">
                     <div class="viva-chat-wrap">
@@ -289,5 +346,7 @@
 </div>
 <script id="session-histories-data" type="application/json">{{ session_histories_json|safe }}</script>
 <script id="session-files-data" type="application/json">{{ session_files_json|safe }}</script>
+<script id="session-meta-data" type="application/json">{{ session_meta_json|safe }}</script>
+<script id="config-files-data" type="application/json">{{ config_files_json|safe }}</script>
 </body>
 </html>

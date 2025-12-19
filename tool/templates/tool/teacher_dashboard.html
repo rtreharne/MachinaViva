@@ -126,7 +126,7 @@
         </div>
 
         <div class="dash-view" data-view-pane="settings">
-            <form id="settings-form" class="settings-grid" method="POST" action="{% url 'assignment_edit_save' %}" data-settings-form novalidate>
+            <form id="settings-form" class="settings-grid max-two" method="POST" action="{% url 'assignment_edit_save' %}" data-settings-form novalidate>
                 {% csrf_token %}
                 <div class="settings-form-card">
                     <div class="settings-card-head">
@@ -190,6 +190,26 @@
                                     <span class="slider"></span>
                                 </label>
                             </div>
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Enable model answers</div>
+                                    <div class="meta">Show exemplar answers after completion.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="enable_model_answers" {% if assignment.enable_model_answers %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Allow students to toggle instructor files</div>
+                                    <div class="meta">Students must include at least one file.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" name="allow_student_resource_toggle" {% if assignment.allow_student_resource_toggle %}checked{% endif %}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div class="settings-row">
@@ -246,6 +266,69 @@
                     <div class="settings-row">
                         <label for="instructor_notes">Instructor notes (private)</label>
                         <textarea id="instructor_notes" name="instructor_notes" rows="3" placeholder="Private notes about this viva.">{{ assignment.instructor_notes }}</textarea>
+                    </div>
+                </div>
+
+                <div class="settings-form-card" data-resource-upload>
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Viva files</h3>
+                    </div>
+                    <div class="settings-row">
+                        <label>Files</label>
+                        <div class="submission-table-wrap" data-resource-list>
+                            <div class="submission-table-header">
+                                <span>File</span>
+                                <span>Include</span>
+                                <span>Actions</span>
+                            </div>
+                            <div class="submission-table-body">
+                                {% for resource in assignment_resources %}
+                                    <div class="submission-row {% cycle 'row-alt' '' %}"
+                                         data-resource-id="{{ resource.id }}"
+                                         data-included="{{ resource.included|yesno:'1,0' }}"
+                                         data-file-name="{{ resource.file_name|cut:'assignment_resources/'|default:'uploaded file' }}"
+                                         data-comment="{{ resource.comment|default_if_none:''|escapejs }}"
+                                         data-file-size="{{ resource.file_size|default:0 }}">
+                                        <div class="submission-cell file-name">
+                                            {{ resource.file_name|cut:"assignment_resources/"|default:"uploaded file"|truncatechars:40 }}
+                                            <div class="meta">
+                                                <a class="link file-preview"
+                                                   href="#"
+                                                   data-preview-text="{{ resource.comment|default_if_none:''|escapejs }}">
+                                                    Preview text
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <div class="submission-cell">
+                                            <label class="slider-toggle" aria-label="Include in viva">
+                                                <input type="checkbox" data-resource-include {% if resource.included %}checked{% endif %}>
+                                                <span class="slider-track">
+                                                    <span class="slider-thumb"></span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <div class="submission-cell submission-actions">
+                                            <button class="icon-btn danger" type="button" data-delete-resource="{{ resource.id }}">Delete</button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="meta {% if assignment_resources %}is-hidden{% endif %}" data-resource-empty>
+                            No viva files yet. Upload files below.
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label>Upload files</label>
+                        <div class="submission-form upload-inline"
+                             data-resource-upload-form
+                             data-upload-url="{% url 'upload_assignment_resource' %}"
+                             data-existing-count="{{ assignment_resources|length|default:0 }}"
+                             data-existing-size="{{ resources_total_size|default:0 }}">
+                            <input type="file" name="file" accept=".pdf,.docx,.txt" multiple data-resource-upload-input>
+                            <button type="button" class="control-btn" data-resource-upload-btn>Upload</button>
+                        </div>
+                        <div class="meta upload-hint is-hidden" data-resource-upload-hint></div>
                     </div>
                 </div>
 

@@ -32,7 +32,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{% url 'assignment_edit_save' %}" class="settings-grid" novalidate>
+        <form method="POST" action="{% url 'assignment_edit_save' %}" class="settings-grid max-two" novalidate>
             {% csrf_token %}
 
             <div class="settings-form-card">
@@ -79,6 +79,22 @@
                         <input type="checkbox" name="allow_student_report" {% if assignment.allow_student_report %}checked{% endif %}>
                         <span class="slider"></span>
                     </label>
+                </div>
+                <div class="settings-row">
+                    <label>Enable model answers</label>
+                    <label class="switch">
+                        <input type="checkbox" name="enable_model_answers" {% if assignment.enable_model_answers %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="meta">Show exemplar answers after completion.</div>
+                </div>
+                <div class="settings-row">
+                    <label>Allow students to toggle instructor files</label>
+                    <label class="switch">
+                        <input type="checkbox" name="allow_student_resource_toggle" {% if assignment.allow_student_resource_toggle %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="meta">Students must include at least one file.</div>
                 </div>
             </div>
 

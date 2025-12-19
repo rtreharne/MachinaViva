@@ -75,15 +75,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const sessionHistories = historiesScript ? JSON.parse(historiesScript.textContent || "{}") : {};
     const filesScript = document.getElementById("session-files-data");
     const sessionFiles = filesScript ? JSON.parse(filesScript.textContent || "{}") : {};
+    const sessionMetaScript = document.getElementById("session-meta-data");
+    const sessionMeta = sessionMetaScript ? JSON.parse(sessionMetaScript.textContent || "{}") : {};
+    const instructorToggleEnabled = pageEl?.dataset.instructorToggleEnabled === "true";
     const eventTracking = pageEl?.dataset.eventTracking === "true";
     const keystrokeTracking = pageEl?.dataset.keystrokeTracking === "true";
     const arrhythmicTracking = pageEl?.dataset.arrhythmicTyping === "true";
+    const modelAnswersEnabled = pageEl?.dataset.modelAnswersEnabled === "true";
     const summaryCard = document.querySelector("[data-viva-summary-card]");
     const summaryPanel = summaryCard;
     const chatCard = document.querySelector("[data-viva-chat-card]");
     const settingsGrid = document.querySelector(".settings-grid");
     const backBtn = document.querySelector("[data-back-summary]");
     const backDashboardBtn = document.querySelector("[data-back-dashboard]");
+    const modelToggleBtn = document.querySelector("[data-toggle-model]");
     const startVivaBtns = document.querySelectorAll("[data-start-viva]");
     const startVivaBlocks = document.querySelectorAll("[data-start-viva-block]");
     const summaryCta = document.querySelector("[data-summary-cta]");
@@ -106,7 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const initialAiMessage = vivaChatWindow?.dataset.initialAi || "... Before we begin: answer in your own words, keep replies concise, stay focused on your submission. The viva will start as soon as you respond to this message.";
     const vivaFilesBox = document.querySelector("[data-viva-files]");
     let vivaIntroStarted = false;
-    let vivaReplyIndex = 0;
     let vivaSessionActive = initialVivaStatus === "in_progress";
     let vivaSessionId = initialSessionId;
     const vivaTimerEl = document.querySelector("[data-viva-timer]");
@@ -119,6 +123,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let vivaTimerInterval = null;
     let vivaExpired = false;
     let viewingHistory = false;
+    let activeHistorySessionId = null;
+    let showModelAnswers = false;
     let startUrlDefault = summaryCta?.dataset.startUrl || null;
     const pendingInclusions = {};
     const maxFilesTotal = 10;
@@ -139,6 +145,45 @@ document.addEventListener("DOMContentLoaded", () => {
             uploadHint.textContent = "";
             uploadHint.classList.add("is-hidden");
         }
+    };
+    const syncInstructorIncludes = () => {
+        const rows = document.querySelectorAll("[data-instructor-resource]");
+        rows.forEach((row) => {
+            const toggle = row.querySelector("[data-instructor-include]");
+            if (!toggle) return;
+            const raw = (row.dataset.included || "").toLowerCase();
+            const isIncluded = raw === "1" || raw === "true" || raw === "yes";
+            toggle.checked = isIncluded;
+            toggle.disabled = !instructorToggleEnabled;
+            toggle.setAttribute("aria-checked", isIncluded ? "true" : "false");
+        });
+    };
+
+    const getInstructorRows = () => Array.from(document.querySelectorAll("[data-instructor-resource]"));
+    const getInstructorIncluded = (row) => {
+        const toggle = row.querySelector("[data-instructor-include]");
+        if (toggle) return !!toggle.checked;
+        const raw = (row.dataset.included || "").toLowerCase();
+        return raw === "1" || raw === "true" || raw === "yes";
+    };
+    const collectSelectedInstructorResourceIds = () => {
+        return getInstructorRows().reduce((acc, row) => {
+            const id = parseInt(row.dataset.resourceId, 10);
+            if (!Number.isFinite(id)) return acc;
+            if (getInstructorIncluded(row)) acc.push(id);
+            return acc;
+        }, []);
+    };
+    const buildSelectedInstructorFiles = () => {
+        return getInstructorRows().reduce((acc, row) => {
+            if (!getInstructorIncluded(row)) return acc;
+            const name = row.dataset.fileName || row.querySelector(".file-name")?.textContent?.trim() || "Resource file";
+            acc.push({
+                file_name: name,
+                comment: row.dataset.comment || "",
+            });
+            return acc;
+        }, []);
     };
 
     const shouldLogEvent = (eventType) => {
@@ -197,6 +242,8 @@ document.addEventListener("DOMContentLoaded", () => {
             logTimer = setTimeout(flushLogs, 1000);
         }
     };
+
+    syncInstructorIncludes();
 
     const getSubmissionRows = () => submissionList ? Array.from(submissionList.querySelectorAll("[data-submission-id]")) : [];
     const buildSelectedFiles = () => {
@@ -294,7 +341,14 @@ document.addEventListener("DOMContentLoaded", () => {
             .filter((bubble) => !bubble.classList.contains("thinking") && !bubble.classList.contains("rating-bubble"))
             .map((bubble) => {
                 const isAi = bubble.classList.contains("ai");
-                return { sender: isAi ? "ai" : "student", text: bubble.textContent || "" };
+                const textEl = bubble.querySelector(".bubble-text");
+                const text = textEl ? textEl.textContent || "" : (bubble.textContent || "");
+                const modelAnswer = bubble.dataset.modelAnswer || "";
+                return {
+                    sender: isAi ? "ai" : "student",
+                    text,
+                    model_answer: isAi ? modelAnswer : "",
+                };
             });
     };
     const renderSessionFiles = (sessionId, allowFallback = false) => {
@@ -302,6 +356,10 @@ document.addEventListener("DOMContentLoaded", () => {
         let files = sessionFiles[String(sessionId)] || [];
         if (!files.length && allowFallback) {
             files = buildSelectedFiles();
+            const selectedInstructorFiles = buildSelectedInstructorFiles();
+            if (selectedInstructorFiles.length) {
+                files = files.concat(selectedInstructorFiles);
+            }
         }
         vivaFilesBox.innerHTML = "";
         const title = document.createElement("div");
@@ -324,7 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
             chip.className = "meta file-chip";
             const name = document.createElement("span");
             name.className = "file-chip-name";
-            name.textContent = (f.file_name || "").replace(/^submissions\//, "");
+            name.textContent = (f.file_name || "").replace(/^(submissions|assignment_resources)\//, "");
             chip.appendChild(name);
 
             const preview = document.createElement("a");
@@ -388,7 +446,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const updateStartUrlFromList = () => {
         const firstRow = getSubmissionRows()[0];
         if (!firstRow) {
-            if (summaryCta) summaryCta.classList.add("is-hidden");
             return;
         }
         const newUrl = firstRow.dataset.startUrl;
@@ -416,7 +473,6 @@ document.addEventListener("DOMContentLoaded", () => {
         vivaSessionActive = true;
         vivaTimeRemaining = vivaTotalSeconds;
         vivaIntroStarted = false;
-        vivaReplyIndex = 0;
         viewingHistory = false;
         clearInterval(vivaTimerInterval);
         vivaTimerInterval = null;
@@ -482,11 +538,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    const addVivaBubble = (sender, text) => {
+    const addVivaBubble = (sender, text, options = {}) => {
         if (!vivaChatWindow) return;
         const bubble = document.createElement("div");
         bubble.className = `bubble ${sender}`;
-        bubble.textContent = text;
+        const content = document.createElement("div");
+        content.className = "bubble-text";
+        content.textContent = text;
+        bubble.appendChild(content);
+        const modelAnswer = options.modelAnswer || "";
+        if (modelAnswer) {
+            bubble.dataset.modelAnswer = modelAnswer;
+            if (options.showModel) {
+                const modelBlock = document.createElement("div");
+                modelBlock.className = "model-answer";
+                const label = document.createElement("span");
+                label.className = "model-answer-label";
+                label.textContent = "Model answer:";
+                const value = document.createElement("span");
+                value.className = "model-answer-text";
+                value.textContent = modelAnswer;
+                modelBlock.appendChild(label);
+                modelBlock.appendChild(value);
+                bubble.appendChild(modelBlock);
+            }
+        }
         vivaChatWindow.appendChild(bubble);
         scrollVivaChat();
     };
@@ -557,12 +633,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateVivaControls = () => {
         const hasSubmissions = getSubmissionRows().length > 0;
+        const instructorSelectedCount = collectSelectedInstructorResourceIds().length;
+        const hasMaterials = hasSubmissions || getInstructorRows().length > 0;
         const includedCount = collectSelectedSubmissionIds().length;
+        const hasRequiredFiles = includedCount > 0 || instructorSelectedCount > 0;
         startVivaBlocks.forEach((block) => {
             block.classList.toggle("is-hidden", true);
         });
         startVivaBtns.forEach((btn) => {
-            btn.disabled = vivaSessionActive || (!vivaSessionActive && (includedCount === 0 || (!hasUnlimitedAttempts() && attemptsLeft <= 0) || !hasSubmissions));
+            btn.disabled = vivaSessionActive || (!vivaSessionActive && (!hasRequiredFiles || (!hasUnlimitedAttempts() && attemptsLeft <= 0) || !hasMaterials));
         });
         backToVivaBtns.forEach((btn) => {
             btn.classList.toggle("is-hidden", !vivaSessionActive);
@@ -574,8 +653,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (summaryCta) {
             summaryCta.dataset.action = vivaSessionActive ? "resume" : "start";
             summaryCta.textContent = vivaSessionActive ? "Return to viva" : "Start Viva";
-            summaryCta.classList.toggle("is-hidden", (!vivaSessionActive && !hasUnlimitedAttempts() && attemptsLeft <= 0) || !hasSubmissions);
-            summaryCta.disabled = (!vivaSessionActive && (includedCount === 0 || (!hasUnlimitedAttempts() && attemptsLeft <= 0) || !hasSubmissions));
+            summaryCta.classList.toggle("is-hidden", (!vivaSessionActive && !hasUnlimitedAttempts() && attemptsLeft <= 0) || !hasMaterials);
+            summaryCta.disabled = (!vivaSessionActive && (!hasRequiredFiles || (!hasUnlimitedAttempts() && attemptsLeft <= 0) || !hasMaterials));
         }
         if (attemptsMeta) {
             if (hasUnlimitedAttempts()) {
@@ -591,16 +670,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const sizeOk = validateUploadSelection();
         if (!uploadSizeInvalid) {
-            setUploadHint(includedCount === 0 && hasSubmissions ? "Select at least one file to start a viva." : "");
+            const hasAnyFiles = hasSubmissions || getInstructorRows().length > 0;
+            setUploadHint(!hasRequiredFiles && hasAnyFiles ? "Select at least one file to start a viva." : "");
         }
     };
-
-    const firstSimulatedQuestion = "Thanks for responding. Let's start: in two sentences, what is the main argument of your submission and why did you choose this approach?";
-    const placeholderReplies = [
-        "What evidence best backs that choice, and what would you strengthen first?",
-        "Where did you consider an alternative approach, and why did you reject it?",
-        "Name one limitation in your work and how you'd address it next."
-    ];
 
     const sendToServer = async (payload, endpoint = "/viva/send/") => {
         try {
@@ -612,7 +685,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 credentials: "same-origin",
                 body: JSON.stringify(payload),
             });
-            return await res.json();
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                return data || { status: "error" };
+            }
+            return data;
         } catch (err) {
             console.warn("Failed to send viva message", err);
             return null;
@@ -623,11 +700,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (vivaSessionId) return vivaSessionId;
         if (!startUrl) return null;
         const selectedIds = collectSelectedSubmissionIds();
-        if (!selectedIds.length) {
+        const selectedResourceIds = collectSelectedInstructorResourceIds();
+        if (!selectedIds.length && !selectedResourceIds.length) {
             setUploadHint("Select at least one file to start a viva.");
             return null;
         }
-        const bodyPayload = { included_submission_ids: selectedIds };
+        const bodyPayload = {
+            included_submission_ids: selectedIds,
+            included_resource_ids: selectedResourceIds,
+        };
         try {
             const res = await fetch(startUrl, {
                 method: "POST",
@@ -647,6 +728,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (Array.isArray(data.included_submissions)) {
                     syncInclusionState(data.included_submissions);
                 }
+                if (Array.isArray(data.included_resources)) {
+                    data.included_resources.forEach((entry) => {
+                        const rid = parseInt(entry.resource_id ?? entry.resourceId, 10);
+                        if (!Number.isFinite(rid)) return;
+                        const row = document.querySelector(`[data-instructor-resource][data-resource-id="${rid}"]`);
+                        const toggle = row?.querySelector("[data-instructor-include]");
+                        if (toggle) toggle.checked = !!entry.included;
+                        if (row) row.dataset.included = entry.included ? "1" : "0";
+                    });
+                }
                 updateVivaControls();
             }
         } catch (err) {
@@ -655,13 +746,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return vivaSessionId;
     };
 
-    const logMessage = (sender, text, extra = {}) => {
-        if (!vivaSessionId || !text) return;
-        sendToServer({
-            session_id: vivaSessionId,
+    const addHistoryEntry = (sessionId, sender, text, modelAnswer = "") => {
+        if (!sessionId || !text) return;
+        const key = String(sessionId);
+        if (!sessionHistories[key]) sessionHistories[key] = [];
+        sessionHistories[key].push({
             sender,
             text,
-            ...extra,
+            ts: new Date().toISOString(),
+            model_answer: modelAnswer || "",
         });
     };
 
@@ -673,6 +766,16 @@ document.addEventListener("DOMContentLoaded", () => {
             submission_id: submissionId,
             included,
         }, "/viva/toggle_submission/");
+    };
+
+    const toggleInstructorResource = (resourceId, included) => {
+        const targetSession = vivaSessionId || lastSessionId;
+        if (!targetSession) return;
+        sendToServer({
+            session_id: targetSession,
+            resource_id: resourceId,
+            included,
+        }, "/viva/toggle_resource/");
     };
 
     const deleteSubmission = async (row, submissionId) => {
@@ -718,6 +821,10 @@ document.addEventListener("DOMContentLoaded", () => {
         navBar?.classList.remove("viva-active");
         lastSessionId = closingSessionId;
         vivaSessionId = null;
+        sessionMeta[String(closingSessionId)] = {
+            completed: true,
+            ended_at: new Date().toISOString(),
+        };
         if (!vivaExpired && attemptsLeft > 0) {
             // Completed a run; allow another attempt
             updateVivaControls();
@@ -725,22 +832,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return closingSessionId;
     };
 
-    const respondPlaceholder = () => {
-        const thinking = showVivaThinking();
-        setVivaInputDisabled(true);
-        const delay = 1100 + Math.random() * 700;
-        setTimeout(() => {
-            thinking?.remove();
-            const reply = vivaReplyIndex === 0
-                ? firstSimulatedQuestion
-                : placeholderReplies[(vivaReplyIndex - 1) % placeholderReplies.length];
-            vivaReplyIndex += 1;
-            addVivaBubble("ai", reply);
-            logMessage("ai", reply);
-            if (!vivaTimerStarted) startVivaTimer();
-            setVivaInputDisabled(false);
-            vivaInput?.focus();
-        }, delay);
+    const requestAiReply = async (sessionId, text) => {
+        if (!sessionId) return null;
+        return await sendToServer({
+            session_id: sessionId,
+            sender: "student",
+            text,
+        });
     };
 
     const enterSubmitMode = () => {
@@ -769,7 +867,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     historySnapshot.push({ sender: "ai", text: feedbackPlaceholder });
                 }
                 sessionHistories[String(sessionId)] = historySnapshot;
-                sessionFiles[String(sessionId)] = buildSelectedFiles();
+                const selectedFiles = buildSelectedFiles();
+                const selectedInstructorFiles = buildSelectedInstructorFiles();
+                sessionFiles[String(sessionId)] = selectedInstructorFiles.length
+                    ? selectedFiles.concat(selectedInstructorFiles)
+                    : selectedFiles;
                 appendAttemptRow(String(sessionId));
             }
             vivaInput.value = "";
@@ -793,11 +895,28 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         if (!text) return;
-        await ensureSession(startUrlDefault);
+        const activeId = await ensureSession(startUrlDefault);
+        if (!activeId) return;
         addVivaBubble("user", text);
-        logMessage("student", text);
+        addHistoryEntry(activeId, "student", text);
         vivaInput.value = "";
-        respondPlaceholder();
+        const thinking = showVivaThinking();
+        setVivaInputDisabled(true);
+        const response = await requestAiReply(activeId, text);
+        if (response?.status === "error") {
+            console.warn("AI reply error:", response?.error || "Unknown error");
+        }
+        thinking?.remove();
+        let reply = response?.ai_text || "";
+        const modelAnswer = response?.ai_model_answer || "";
+        if (!reply) {
+            reply = "Thanks. Could you clarify that point a little more?";
+        }
+        addVivaBubble("ai", reply, { modelAnswer });
+        addHistoryEntry(activeId, "ai", reply, modelAnswer);
+        if (!vivaTimerStarted) startVivaTimer();
+        setVivaInputDisabled(false);
+        vivaInput?.focus();
     };
 
     const handleRatingClick = (value) => {
@@ -812,15 +931,45 @@ document.addEventListener("DOMContentLoaded", () => {
         updateVivaControls();
     };
 
-    const showHistory = (sessionId) => {
+    const historyHasModelAnswers = (sessionId) => {
         const history = sessionHistories[String(sessionId)] || [];
-        viewingHistory = true;
-        vivaSessionActive = false;
+        return history.some((m) => (m.model_answer || "").trim());
+    };
+
+    const updateModelToggle = (sessionId) => {
+        if (!modelToggleBtn) return;
+        const meta = sessionMeta[String(sessionId)] || {};
+        const canShow = modelAnswersEnabled && !!meta.completed && historyHasModelAnswers(sessionId);
+        modelToggleBtn.classList.toggle("is-hidden", !canShow);
+        if (!canShow) {
+            showModelAnswers = false;
+        }
+        modelToggleBtn.textContent = showModelAnswers ? "Hide model answers" : "Show model answers";
+    };
+
+    const renderHistory = (sessionId) => {
+        const history = sessionHistories[String(sessionId)] || [];
         clearVivaChat();
         history.forEach((m) => {
             const sender = (m.sender || "").toLowerCase() === "ai" ? "ai" : "user";
-            addVivaBubble(sender, m.text || "");
+            if (sender === "ai") {
+                addVivaBubble("ai", m.text || "", {
+                    modelAnswer: m.model_answer || "",
+                    showModel: showModelAnswers,
+                });
+            } else {
+                addVivaBubble("user", m.text || "");
+            }
         });
+    };
+
+    const showHistory = (sessionId) => {
+        viewingHistory = true;
+        vivaSessionActive = false;
+        activeHistorySessionId = sessionId;
+        showModelAnswers = false;
+        updateModelToggle(sessionId);
+        renderHistory(sessionId);
         renderSessionFiles(sessionId);
         vivaInputRow?.classList.add("is-hidden");
         setVivaInputDisabled(true);
@@ -835,6 +984,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!activeId) return;
         vivaSessionId = activeId;
         lastSessionId = activeId;
+        activeHistorySessionId = null;
+        showModelAnswers = false;
+        if (modelToggleBtn) {
+            modelToggleBtn.classList.add("is-hidden");
+            modelToggleBtn.textContent = "Show model answers";
+        }
         if (vivaTimerEl) {
             const dsRem = parseInt(vivaTimerEl.dataset.vivaSeconds || "", 10);
             if (Number.isFinite(dsRem)) vivaTimeRemaining = Math.max(0, dsRem);
@@ -866,6 +1021,15 @@ document.addEventListener("DOMContentLoaded", () => {
         updateVivaControls();
     };
 
+    if (modelToggleBtn) {
+        modelToggleBtn.addEventListener("click", () => {
+            if (!activeHistorySessionId) return;
+            showModelAnswers = !showModelAnswers;
+            updateModelToggle(activeHistorySessionId);
+            renderHistory(activeHistorySessionId);
+        });
+    }
+
     vivaSend?.addEventListener("click", handleVivaSend);
     vivaInput?.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -880,23 +1044,44 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     if (vivaInput && arrhythmicTracking) {
         let lastKeyTs = null;
+        let consecutiveAnomalies = 0;
         const intervals = [];
-        vivaInput.addEventListener("keydown", () => {
+        const isTextKey = (event) => {
+            if (!event) return false;
+            if (event.ctrlKey || event.metaKey || event.altKey) return false;
+            if (event.key === "Backspace" || event.key === "Delete") return true;
+            if (event.key && event.key.length === 1) return true;
+            return false;
+        };
+        const median = (values) => {
+            if (!values.length) return 0;
+            const sorted = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        };
+        vivaInput.addEventListener("keydown", (event) => {
             if (!vivaSessionActive || !vivaSessionId) return;
+            if (!isTextKey(event)) return;
             const now = Date.now();
             if (lastKeyTs) {
                 const interval = now - lastKeyTs;
                 intervals.push(interval);
-                if (intervals.length > 8) intervals.shift();
-                if (intervals.length >= 6) {
-                    const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-                    const spike = interval > avg * 3 && interval > 1200;
-                    const rush = interval < avg / 3 && avg > 120;
-                    if ((spike || rush) && now - lastArrhythmicLog > 15000) {
+                if (intervals.length > 12) intervals.shift();
+                if (intervals.length >= 12) {
+                    const mid = median(intervals);
+                    const spike = interval > mid * 4 && interval > 2000;
+                    const rush = interval < mid * 0.25 && mid > 200;
+                    if (spike || rush) {
+                        consecutiveAnomalies += 1;
+                    } else {
+                        consecutiveAnomalies = 0;
+                    }
+                    if (consecutiveAnomalies >= 2 && now - lastArrhythmicLog > 30000) {
                         lastArrhythmicLog = now;
+                        consecutiveAnomalies = 0;
                         queueLog("arrhythmic_typing", {
                             interval_ms: Math.round(interval),
-                            avg_ms: Math.round(avg),
+                            median_ms: Math.round(mid),
                         });
                     }
                 }
@@ -922,6 +1107,12 @@ document.addEventListener("DOMContentLoaded", () => {
         chatCard.classList.add("is-hidden");
         summaryCard.classList.remove("is-hidden");
         viewingHistory = false;
+        activeHistorySessionId = null;
+        showModelAnswers = false;
+        if (modelToggleBtn) {
+            modelToggleBtn.classList.add("is-hidden");
+            modelToggleBtn.textContent = "Show model answers";
+        }
         vivaInputRow?.classList.remove("is-hidden");
         vivaIntroStarted = false;
     };
@@ -952,7 +1143,7 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             if (!hasUnlimitedAttempts() && attemptsLeft <= 0) return;
             if (!validateUploadSelection()) return;
-            if (!collectSelectedSubmissionIds().length) {
+            if (!collectSelectedSubmissionIds().length && !collectSelectedInstructorResourceIds().length) {
                 setUploadHint("Select at least one file to start a viva.");
                 return;
             }
@@ -1003,7 +1194,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (action === "start") {
                 if (!hasUnlimitedAttempts() && attemptsLeft <= 0) return;
                 if (!validateUploadSelection()) return;
-                if (!collectSelectedSubmissionIds().length) {
+                if (!collectSelectedSubmissionIds().length && !collectSelectedInstructorResourceIds().length) {
                     setUploadHint("Select at least one file to start a viva.");
                     return;
                 }
@@ -1034,6 +1225,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 deleteSubmission(row, submissionId);
             });
         }
+    });
+
+    getInstructorRows().forEach((row) => {
+        const toggle = row.querySelector("[data-instructor-include]");
+        const resourceId = parseInt(row.dataset.resourceId, 10);
+        if (!toggle || !Number.isFinite(resourceId)) return;
+        if (!instructorToggleEnabled) return;
+        toggle.addEventListener("change", () => {
+            row.dataset.included = toggle.checked ? "1" : "0";
+            if (vivaSessionActive && (vivaSessionId || lastSessionId)) {
+                toggleInstructorResource(resourceId, !!toggle.checked);
+            }
+            updateVivaControls();
+        });
     });
     updateStartUrlFromList();
 

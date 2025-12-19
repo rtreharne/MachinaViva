@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from .helpers import is_instructor_role, is_admin_role, fetch_nrps_roster
-from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaFeedback, VivaSessionSubmission, InteractionLog
+from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaFeedback, VivaSessionSubmission, InteractionLog, AssignmentResource, VivaSessionResource
 from datetime import datetime
 from django.utils.timezone import now
 from .viva import compute_integrity_flags
@@ -79,6 +79,8 @@ def assignment_edit_save(request):
     assignment.keystroke_tracking = (request.POST.get("keystroke_tracking") == "on")
     assignment.event_tracking = (request.POST.get("event_tracking") == "on")
     assignment.arrhythmic_typing = (request.POST.get("arrhythmic_typing") == "on")
+    assignment.enable_model_answers = (request.POST.get("enable_model_answers") == "on")
+    assignment.allow_student_resource_toggle = (request.POST.get("allow_student_resource_toggle") == "on")
 
     assignment.save()
 
@@ -121,12 +123,119 @@ def assignment_view(request):
         assignment.save()
 
     # --------------------------------------------------------------
+    # Apply deep link custom settings on first creation
+    # --------------------------------------------------------------
+    if created:
+        custom = claims.get("https://purl.imsglobal.org/spec/lti/claim/custom") or {}
+        if isinstance(custom, dict) and custom:
+            def as_bool(value, default=False):
+                if value is None:
+                    return default
+                return str(value).strip().lower() in ["1", "true", "yes", "on"]
+
+            desc = custom.get("assignment_description")
+            if desc:
+                assignment.description = desc
+
+            duration_minutes = custom.get("viva_duration_minutes")
+            try:
+                duration_int = max(1, int(duration_minutes))
+                assignment.viva_duration_seconds = duration_int * 60
+            except (TypeError, ValueError):
+                pass
+
+            unlimited = as_bool(custom.get("unlimited_attempts"), default=False)
+            if unlimited:
+                assignment.max_attempts = 0
+                assignment.allow_multiple_submissions = True
+            else:
+                max_attempts = custom.get("max_attempts")
+                try:
+                    attempts_int = max(1, int(max_attempts))
+                    assignment.max_attempts = attempts_int
+                    assignment.allow_multiple_submissions = attempts_int > 1
+                except (TypeError, ValueError):
+                    pass
+
+            tone = custom.get("viva_tone")
+            if tone:
+                assignment.viva_tone = tone
+
+            feedback_visibility = custom.get("feedback_visibility")
+            if feedback_visibility:
+                assignment.feedback_visibility = feedback_visibility
+
+            assignment.allow_student_report = as_bool(
+                custom.get("allow_student_report"),
+                default=assignment.allow_student_report
+            )
+            assignment.event_tracking = as_bool(
+                custom.get("event_tracking"),
+                default=assignment.event_tracking
+            )
+            assignment.keystroke_tracking = as_bool(
+                custom.get("keystroke_tracking"),
+                default=assignment.keystroke_tracking
+            )
+            assignment.arrhythmic_typing = as_bool(
+                custom.get("arrhythmic_typing"),
+                default=assignment.arrhythmic_typing
+            )
+            assignment.enable_model_answers = as_bool(
+                custom.get("enable_model_answers"),
+                default=assignment.enable_model_answers
+            )
+            assignment.allow_student_resource_toggle = as_bool(
+                custom.get("allow_student_resource_toggle"),
+                default=assignment.allow_student_resource_toggle
+            )
+
+            viva_instructions = custom.get("viva_instructions")
+            if viva_instructions is not None:
+                assignment.viva_instructions = viva_instructions
+
+            additional_prompts = custom.get("additional_prompts")
+            if additional_prompts is not None:
+                assignment.additional_prompts = additional_prompts
+
+            instructor_notes = custom.get("instructor_notes")
+            if instructor_notes is not None:
+                assignment.instructor_notes = instructor_notes
+
+            assignment.save()
+
+    # --------------------------------------------------------------
     # Instructor view
     # --------------------------------------------------------------
     if is_instructor_role(roles) or is_admin_role(roles):
         submissions = Submission.objects.filter(
+            assignment=assignment,
+            is_placeholder=False,
+        ).order_by("-created_at")
+
+        assignment_resources = AssignmentResource.objects.filter(
             assignment=assignment
         ).order_by("-created_at")
+        resources_total_size = 0
+        resource_payloads = []
+        included_resource_entries = []
+        for resource in assignment_resources:
+            file_size = resource.file.size if resource.file else 0
+            resources_total_size += file_size
+            payload = {
+                "id": resource.id,
+                "file_name": resource.file.name if resource.file else "Uploaded file",
+                "created_at": resource.created_at,
+                "comment": resource.comment,
+                "included": resource.included,
+                "file_size": file_size,
+            }
+            resource_payloads.append(payload)
+            if resource.included:
+                included_resource_entries.append({
+                    "file_name": payload["file_name"],
+                    "comment": payload["comment"],
+                })
 
         # Latest submission per learner
         submission_map = {}
@@ -182,7 +291,13 @@ def assignment_view(request):
 
             viva_attempts = []
             if sessions_qs.exists():
-                link_qs = VivaSessionSubmission.objects.filter(session__in=sessions_qs).select_related("submission")
+                link_qs = VivaSessionSubmission.objects.filter(
+                    session__in=sessions_qs,
+                    submission__is_placeholder=False,
+                ).select_related("submission")
+                resource_links_qs = VivaSessionResource.objects.filter(
+                    session__in=sessions_qs
+                ).select_related("resource")
                 links_by_session = {}
                 for link in link_qs:
                     if not link.included:
@@ -192,7 +307,23 @@ def assignment_view(request):
                         "file_name": link.submission.file.name if link.submission.file else "",
                         "comment": link.submission.comment,
                     })
+                resources_by_session = {}
+                resource_sessions_seen = set()
+                for link in resource_links_qs:
+                    resource_sessions_seen.add(link.session_id)
+                    if not link.included:
+                        continue
+                    res = link.resource
+                    resources_by_session.setdefault(link.session_id, []).append({
+                        "file_name": res.file.name if res.file else "",
+                        "comment": res.comment,
+                    })
                 for sess in sessions_qs:
+                    files = links_by_session.get(sess.id, [])
+                    if sess.id in resource_sessions_seen:
+                        resource_files = resources_by_session.get(sess.id, [])
+                    else:
+                        resource_files = included_resource_entries
                     logs_qs = InteractionLog.objects.filter(submission=sess.submission).order_by("timestamp")
                     logs_by_session = logs_qs.filter(event_data__session_id=sess.id)
                     if logs_by_session.exists():
@@ -247,7 +378,7 @@ def assignment_view(request):
                         "flags": compute_integrity_flags(sess),
                         "created_at": sess.started_at.isoformat(),
                         "status": "completed" if sess.ended_at else "in_progress",
-                        "files": links_by_session.get(sess.id, []),
+                        "files": files + resource_files,
                         "events": events,
                     })
 
@@ -307,28 +438,65 @@ def assignment_view(request):
             "now": datetime.now(),
             "duration_minutes": int(assignment.viva_duration_seconds / 60) if assignment.viva_duration_seconds else 10,
             "tones": ["Supportive", "Neutral", "Probing", "Peer-like"],
+            "assignment_resources": resource_payloads,
+            "resources_total_size": resources_total_size,
         })
 
     # --------------------------------------------------------------
     # Student view
     # --------------------------------------------------------------
-    student_submissions = Submission.objects.filter(
+    student_submissions_all = Submission.objects.filter(
         assignment=assignment,
         user_id=user_id
     ).order_by("-created_at")
+    student_submissions = student_submissions_all.filter(is_placeholder=False)
+    placeholder_submission = student_submissions_all.filter(
+        is_placeholder=True
+    ).order_by("-created_at").first()
 
-    latest = student_submissions.first() if student_submissions else None
+    all_resources = AssignmentResource.objects.filter(
+        assignment=assignment
+    ).order_by("-created_at")
+    included_resources = all_resources.filter(included=True)
+    has_included_resources = included_resources.exists()
+    if not student_submissions.exists() and has_included_resources and not placeholder_submission:
+        placeholder_submission = Submission.objects.create(
+            assignment=assignment,
+            user_id=user_id,
+            file=None,
+            comment="",
+            is_placeholder=True,
+        )
+    config_files = [
+        {
+            "file_name": resource.file.name if resource.file else "Resource file",
+            "comment": resource.comment,
+        }
+        for resource in included_resources
+    ]
+
+    latest = student_submissions.first() if student_submissions.exists() else None
     session = None
     active_session = None
     status = "no_submission"
     remaining_seconds = None
     feedback = None
     flags = []
-
-    if latest:
-        status = "submitted"
-        active_session = VivaSession.objects.filter(submission=latest, ended_at__isnull=True).order_by("-started_at").first()
-        session = active_session or VivaSession.objects.filter(submission=latest).order_by("-started_at").first()
+    has_any_submission = student_submissions_all.exists() or bool(placeholder_submission)
+    sessions = VivaSession.objects.filter(
+        submission__assignment=assignment,
+        submission__user_id=user_id
+    ).order_by("-started_at") if has_any_submission else VivaSession.objects.none()
+    active_session = sessions.filter(ended_at__isnull=True).first()
+    session = active_session or sessions.first()
+    latest_submission = None
+    if session:
+        latest_submission = session.submission
+    elif latest:
+        latest_submission = latest
+    elif has_included_resources:
+        latest_submission = placeholder_submission
+    latest = latest_submission
 
     if session:
         elapsed = (now() - session.started_at).total_seconds()
@@ -340,26 +508,52 @@ def assignment_view(request):
         except VivaFeedback.DoesNotExist:
             feedback = None
         flags = compute_integrity_flags(session)
+    elif latest:
+        status = "submitted"
+
+    resource_payloads = []
+    resource_include_map = {}
+    if active_session:
+        resource_links = VivaSessionResource.objects.filter(session=active_session)
+        if resource_links.exists():
+            resource_include_map = {
+                link.resource_id: link.included
+                for link in resource_links
+            }
+    for resource in all_resources:
+        resource_payloads.append({
+            "id": resource.id,
+            "file_name": resource.file.name if resource.file else "Resource file",
+            "comment": resource.comment,
+            "included": resource_include_map.get(resource.id, resource.included),
+            "file_size": resource.file.size if resource.file else 0,
+        })
 
     max_attempts = assignment.max_attempts
-    sessions = VivaSession.objects.filter(
-        submission__assignment=assignment,
-        submission__user_id=user_id
-    ).order_by("-started_at") if latest else VivaSession.objects.none()
-
     session_histories = {}
     session_links = {}
+    session_resource_links = {}
+    resource_sessions_seen = set()
     active_include_map = {}
+    session_meta = {}
     if sessions:
         all_messages = VivaMessage.objects.filter(session__in=sessions).order_by("timestamp")
         msgs_by_session = {}
         for m in all_messages:
+            sender = (m.sender or "").lower()
             msgs_by_session.setdefault(m.session_id, []).append({
                 "sender": m.sender,
                 "text": m.text,
                 "ts": m.timestamp.isoformat(),
+                "model_answer": m.model_answer if sender == "ai" and m.model_answer else "",
             })
-        link_qs = VivaSessionSubmission.objects.filter(session__in=sessions).select_related("submission")
+        link_qs = VivaSessionSubmission.objects.filter(
+            session__in=sessions,
+            submission__is_placeholder=False,
+        ).select_related("submission")
+        resource_links_qs = VivaSessionResource.objects.filter(
+            session__in=sessions
+        ).select_related("resource")
         for link in link_qs:
             session_links.setdefault(link.session_id, []).append({
                 "submission_id": link.submission_id,
@@ -369,13 +563,27 @@ def assignment_view(request):
             })
             if active_session and link.session_id == active_session.id:
                 active_include_map[link.submission_id] = link.included
+        session_resource_links = {}
+        resource_sessions_seen = set()
+        for link in resource_links_qs:
+            resource_sessions_seen.add(link.session_id)
+            session_resource_links.setdefault(link.session_id, []).append({
+                "file_name": link.resource.file.name if link.resource and link.resource.file else "",
+                "comment": link.resource.comment,
+                "included": link.included,
+            })
         for s in sessions:
+            session_meta[s.id] = {
+                "completed": bool(s.ended_at),
+                "ended_at": s.ended_at.isoformat() if s.ended_at else "",
+            }
             history = msgs_by_session.get(s.id, [])
             if s.feedback_text:
                 history.append({
                     "sender": "ai",
                     "text": s.feedback_text,
                     "ts": s.ended_at.isoformat() if s.ended_at else now().isoformat(),
+                    "model_answer": "",
                 })
             session_histories[s.id] = history
 
@@ -399,9 +607,9 @@ def assignment_view(request):
             "file_size": file_size,
         })
 
-    existing_sessions = sessions.count() if latest else 0
+    existing_sessions = sessions.count()
     if max_attempts and max_attempts > 0:
-        attempts_left = max(0, max_attempts - existing_sessions) if latest else max_attempts
+        attempts_left = max(0, max_attempts - existing_sessions)
     else:
         attempts_left = -1  # unlimited
 
@@ -410,17 +618,37 @@ def assignment_view(request):
     duration_minutes = int(assignment.viva_duration_seconds / 60) if assignment.viva_duration_seconds else None
 
     session_histories_json = json.dumps(session_histories, default=str)
+    session_meta_json = json.dumps(session_meta, default=str)
+    default_resource_entries = [
+        {
+            "file_name": resource.file.name if resource.file else "Resource file",
+            "comment": resource.comment,
+        }
+        for resource in included_resources
+    ]
     session_files_json = json.dumps({
-        sid: [
+        s.id: (
+        [
             {
                 "submission_id": entry["submission_id"],
                 "file_name": entry["file_name"],
                 "comment": entry["comment"],
             }
-            for entry in entries if entry.get("included")
-        ]
-        for sid, entries in session_links.items()
+            for entry in session_links.get(s.id, []) if entry.get("included")
+        ] + [
+            {
+                "file_name": entry["file_name"],
+                "comment": entry["comment"],
+            }
+            for entry in (
+                session_resource_links.get(s.id, [])
+                if s.id in resource_sessions_seen
+                else default_resource_entries
+            ) if entry.get("included", True)
+        ])
+        for s in sessions
     }, default=str)
+    config_files_json = json.dumps(config_files, default=str)
 
     return render(request, "tool/student_submit.html", {
         "assignment": assignment,
@@ -439,6 +667,10 @@ def assignment_view(request):
         "session": active_session,
         "viva_sessions": sessions,
         "session_histories_json": session_histories_json,
+        "session_meta_json": session_meta_json,
         "session_files_json": session_files_json,
+        "config_files_json": config_files_json,
+        "config_files_included": True if config_files else False,
+        "assignment_resources": resource_payloads,
         "submissions_total_size": submissions_total_size,
     })

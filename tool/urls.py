@@ -27,6 +27,9 @@ urlpatterns = [
     path("submit_file/", views.submit_file, name="submit_file"),
     path("submission/<int:submission_id>/delete/", views.delete_submission, name="delete_submission"),
     path("submission/<int:submission_id>/", views.submission_status, name="submission_status"),
+    path("assignment/resources/upload/", views.upload_assignment_resource, name="upload_assignment_resource"),
+    path("assignment/resources/<int:resource_id>/toggle/", views.toggle_assignment_resource, name="toggle_assignment_resource"),
+    path("assignment/resources/<int:resource_id>/delete/", views.delete_assignment_resource, name="delete_assignment_resource"),
 
     # nprs
     path("nrps/test/", views.nrps_test, name="nrps_test"),
@@ -37,6 +40,7 @@ urlpatterns = [
     path("viva/session/<int:session_id>/", views.viva_session, name="viva_session"),
     path("viva/send/", views.viva_send_message, name="viva_send_message"),
     path("viva/toggle_submission/", views.viva_toggle_submission, name="viva_toggle_submission"),
+    path("viva/toggle_resource/", views.viva_toggle_resource, name="viva_toggle_resource"),
     path("viva/log/", views.viva_log_event, name="viva_log_event"),
     path("viva/summary/<int:session_id>/", views.viva_summary, name="viva_summary"),
     path("viva/logs/<int:session_id>/", views.viva_logs, name="viva_logs"),
