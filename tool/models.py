@@ -1,4 +1,8 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+User = get_user_model()
 
 class Assignment(models.Model):
     slug = models.SlugField(unique=True)  # matches Canvas resource_link_id
@@ -7,6 +11,13 @@ class Assignment(models.Model):
     allow_multiple_submissions = models.BooleanField(default=False)
     max_attempts = models.IntegerField(default=1)
     viva_duration_seconds = models.IntegerField(default=600)  # 10 minutes default
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="owned_assignments",
+        null=True,
+        blank=True,
+    )
 
     # NEW FIELDS
     viva_instructions = models.TextField(
@@ -122,9 +133,6 @@ class InteractionLog(models.Model):
     event_data = models.JSONField(default=dict)
     timestamp = models.DateTimeField(auto_now_add=True)
 
-
-from django.db import models
-
 class ToolConfig(models.Model):
     """
     Stores Canvas platform details.
@@ -164,3 +172,89 @@ class VivaFeedback(models.Model):
 
     def __str__(self):
         return f"Feedback for session {self.session.id}"
+
+
+class UserProfile(models.Model):
+    ROLE_INSTRUCTOR = "instructor"
+    ROLE_STUDENT = "student"
+    ROLE_CHOICES = [
+        (ROLE_INSTRUCTOR, "Instructor"),
+        (ROLE_STUDENT, "Student"),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    institution_type = models.CharField(max_length=50, blank=True)
+    institution_name = models.CharField(max_length=255, blank=True)
+    verification_token = models.CharField(max_length=100, blank=True)
+    verification_sent_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email or self.user.username} ({self.get_role_display()})"
+
+
+class AssignmentMembership(models.Model):
+    ROLE_STUDENT = "student"
+    ROLE_INSTRUCTOR = "instructor"
+    ROLE_CHOICES = [
+        (ROLE_STUDENT, "Student"),
+        (ROLE_INSTRUCTOR, "Instructor"),
+    ]
+
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="assignment_memberships")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_STUDENT)
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="sent_memberships",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("assignment", "user")
+
+    def __str__(self):
+        return f"{self.assignment.title} → {self.user} ({self.get_role_display()})"
+
+
+class AssignmentInvitation(models.Model):
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name="invitations")
+    email = models.EmailField()
+    token = models.CharField(max_length=64, unique=True)
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="sent_invitations",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    redeemed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="accepted_invitations",
+        null=True,
+        blank=True,
+    )
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["token"]),
+            models.Index(fields=["email"]),
+        ]
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        status = "accepted" if self.accepted_at else "pending"
+        return f"Invite to {self.email} for {self.assignment.title} ({status})"

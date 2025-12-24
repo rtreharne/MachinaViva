@@ -5,6 +5,21 @@ urlpatterns = [
     #path("", views.index),
     path("", views.home, name="landing_home"),
 
+    # Standalone auth + app
+    path("app/signup/", views.standalone_signup, name="standalone_signup"),
+    path("app/login/", views.standalone_login, name="standalone_login"),
+    path("app/logout/", views.standalone_logout, name="standalone_logout"),
+    path("app/", views.standalone_app_home, name="standalone_app_home"),
+    path("app/assignments/new/", views.standalone_assignment_create, name="standalone_assignment_create"),
+    path("app/assignments/<slug:slug>/", views.standalone_assignment_entry, name="standalone_assignment_entry"),
+    path("app/assignments/<slug:slug>/invite/create/", views.standalone_invite_create, name="standalone_invite_create"),
+    path("app/assignments/<slug:slug>/invites/", views.standalone_invites, name="standalone_invites"),
+    path("app/invites/<int:invite_id>/resend/", views.standalone_invite_resend, name="standalone_invite_resend"),
+    path("app/student/", views.standalone_student_assignments, name="standalone_student_assignments"),
+    path("app/student/assignments/<slug:slug>/", views.standalone_student_entry, name="standalone_student_entry"),
+    path("invite/<str:token>/", views.accept_invite, name="accept_invite"),
+    path("app/verify/<str:token>/", views.verify_instructor, name="verify_instructor"),
+
     # LTI Core
     path("login/", views.lti_login, name="lti_login"),
     path("launch/", views.lti_launch, name="lti_launch"),

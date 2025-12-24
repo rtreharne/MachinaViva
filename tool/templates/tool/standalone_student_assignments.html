@@ -1,0 +1,32 @@
+{% extends "tool/standalone_base.html" %}
+{% block page_title %}Standalone | My assignments{% endblock %}
+{% block content %}
+<div class="standalone-header">
+    <div>
+        <p class="eyebrow">Student</p>
+        <h2>Assignments</h2>
+        <p class="lede">Accept invites to see available vivas and continue where you left off.</p>
+    </div>
+</div>
+
+{% if memberships %}
+    <div class="table-card">
+        <div class="table-head cols-3">
+            <div>Title</div>
+            <div>Added</div>
+            <div>Action</div>
+        </div>
+        {% for membership in memberships %}
+            <div class="table-row cols-3">
+                <div>{{ membership.assignment.title }}</div>
+                <div class="meta">{{ membership.created_at }}</div>
+                <div class="inline-actions">
+                    <a class="pill yes" href="{% url 'standalone_student_entry' membership.assignment.slug %}">Open</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p class="standalone-muted">No assignments yet. Check your invite link or ask your instructor to resend.</p>
+{% endif %}
+{% endblock %}

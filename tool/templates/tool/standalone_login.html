@@ -1,0 +1,30 @@
+{% extends "tool/standalone_base.html" %}
+{% block page_title %}Log in{% endblock %}
+{% block content %}
+<div class="standalone-center">
+    <div class="settings-form-card standalone-narrow">
+        <h2>Log in</h2>
+        {% if error %}
+            <div class="alert error">{{ error }}</div>
+        {% endif %}
+        <form method="post" class="settings-grid single-column">
+            {% csrf_token %}
+            {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
+            <div class="settings-row">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" required>
+            </div>
+            <div class="settings-row">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" required>
+            </div>
+            <div class="settings-actions">
+                <button type="submit" class="view-btn">Log in</button>
+            </div>
+        </form>
+        <p class="muted center-text signup-hint">Need an account? <a class="link" href="{% url 'standalone_signup' %}">Instructor signup</a></p>
+    </div>
+</div>
+{% endblock %}

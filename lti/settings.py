@@ -91,6 +91,8 @@ USE_TZ = True
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+LOGIN_URL = "/app/login/"
+LOGIN_REDIRECT_URL = "/app/"
 
 
 # ----------------------------------------------------
@@ -123,6 +125,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ----------------------------------------------------
+# Email (default to console for dev)
+# ----------------------------------------------------
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@machinaviva.local")
 
 
 # ----------------------------------------------------

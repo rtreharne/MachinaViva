@@ -1,0 +1,17 @@
+{% extends "tool/standalone_base.html" %}
+{% block page_title %}Email verification{% endblock %}
+{% block content %}
+<div class="standalone-center">
+    <div class="settings-form-card standalone-narrow">
+        {% if status == "success" %}
+            <h2>Verified</h2>
+            <p class="muted">Your email has been verified and your instructor account is active.</p>
+            <p class="muted center-text signup-hint"><a class="link" href="{% url 'standalone_app_home' %}">Go to assignments</a></p>
+        {% else %}
+            <h2>Link invalid</h2>
+            <p class="muted">This verification link is not valid. Please request a new signup.</p>
+            <p class="muted center-text signup-hint"><a class="link" href="{% url 'standalone_signup' %}">Start again</a></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

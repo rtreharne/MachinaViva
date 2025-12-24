@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from .helpers import is_instructor_role, is_admin_role, fetch_nrps_roster
-from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaFeedback, VivaSessionSubmission, InteractionLog, AssignmentResource, VivaSessionResource
+from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaFeedback, VivaSessionSubmission, InteractionLog, AssignmentResource, VivaSessionResource, AssignmentInvitation
 from datetime import datetime
 from django.utils.timezone import now
 from .viva import compute_integrity_flags
@@ -207,7 +207,16 @@ def assignment_view(request):
     # --------------------------------------------------------------
     # Instructor view
     # --------------------------------------------------------------
-    if is_instructor_role(roles) or is_admin_role(roles):
+    from_standalone = bool(
+        request.session.get("standalone_from_dashboard")
+        or (
+            request.user.is_authenticated
+            and getattr(assignment, "owner_id", None) == getattr(request.user, "id", None)
+            and not request.session.get("lti_claims")
+        )
+    )
+
+    if is_instructor_role(roles) or is_admin_role(roles) or from_standalone:
         submissions = Submission.objects.filter(
             assignment=assignment,
             is_placeholder=False,
@@ -431,6 +440,85 @@ def assignment_view(request):
             },
         }
 
+        pending_invites = []
+        accepted_invite_user_ids = set()
+        if from_standalone:
+            invite_qs_pending = AssignmentInvitation.objects.filter(
+                assignment=assignment,
+                accepted_at__isnull=True,
+            ).order_by("-created_at")
+            for inv in invite_qs_pending:
+                pending_invites.append({
+                    "email": inv.email,
+                    "status": "Expired" if inv.is_expired else "Pending",
+                    "invite_id": inv.id,
+                })
+                students.append({
+                    "user_id": f"invite-{inv.id}",
+                    "name": inv.email,
+                    "submission_id": None,
+                    "status": "invited",
+                    "remaining_seconds": None,
+                    "submitted_at": None,
+                    "flags": [],
+                    "viva": None,
+                    "vivas": [],
+                    "is_invite": True,
+                    "invite_id": inv.id,
+                    "invite_status": "Expired" if inv.is_expired else "Pending",
+                })
+
+            invite_qs_accepted = AssignmentInvitation.objects.filter(
+                assignment=assignment,
+                accepted_at__isnull=False,
+            ).select_related("redeemed_by")
+            for inv in invite_qs_accepted:
+                if inv.redeemed_by_id:
+                    accepted_invite_user_ids.add(str(inv.redeemed_by_id))
+
+            # mark accepted invites already in roster
+            student_index = {s["user_id"]: idx for idx, s in enumerate(students)}
+            for uid in accepted_invite_user_ids:
+                if uid in student_index:
+                    students[student_index[uid]]["accepted_invite"] = True
+
+            # add accepted invite rows if not present
+            for inv in invite_qs_accepted:
+                uid = str(inv.redeemed_by_id or inv.email)
+                display_name = inv.email
+                if inv.redeemed_by:
+                    # Prefer sortable_name if we can infer it
+                    first = (inv.redeemed_by.first_name or "").strip()
+                    last = (inv.redeemed_by.last_name or "").strip()
+                    if last or first:
+                        display_name = f"{last}, {first}".strip(", ")
+                if uid in student_index:
+                    students[student_index[uid]]["name"] = display_name
+                    students[student_index[uid]]["accepted_invite"] = True
+                else:
+                    students.append({
+                        "user_id": uid,
+                        "name": display_name,
+                        "submission_id": None,
+                        "status": "pending",
+                        "remaining_seconds": None,
+                        "submitted_at": None,
+                        "flags": [],
+                        "viva": None,
+                        "vivas": [],
+                        "is_invite": False,
+                        "accepted_invite": True,
+                    })
+
+            # Float accepted invites to the top, then invited, then others
+            students = sorted(
+                students,
+                key=lambda s: (
+                    0 if s.get("accepted_invite") else (1 if s.get("is_invite") else 2),
+                    s.get("name", "").lower(),
+                )
+            )
+
         return render(request, "tool/teacher_dashboard.html", {
             "assignment": assignment,
             "students": students,
@@ -440,6 +528,8 @@ def assignment_view(request):
             "tones": ["Supportive", "Neutral", "Probing", "Peer-like"],
             "assignment_resources": resource_payloads,
             "resources_total_size": resources_total_size,
+            "from_standalone": from_standalone,
+            "pending_invites": pending_invites,
         })
 
     # --------------------------------------------------------------

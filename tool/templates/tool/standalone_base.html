@@ -1,0 +1,80 @@
+{% load static %}
+{% now "U" as cachebust %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block page_title %}MachinaViva{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'tool/home.css' %}?v={{ cachebust }}">
+    <script>
+        (function() {
+            const saved = localStorage.getItem("mv-theme");
+            const mode = saved === "light" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", mode);
+        })();
+    </script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="page page-with-footer">
+
+    <header class="nav">
+        <a class="brand" href="{% url 'landing_home' %}" aria-label="MachinaViva home">
+            <span class="brand-mark">MV</span>
+            <span>MachinaViva</span>
+        </a>
+        <div class="nav-actions view-toggle">
+            {% if request.user.is_authenticated %}
+                {% if request.user.profile.role == "instructor" %}
+                    <a class="view-btn" href="{% url 'standalone_app_home' %}">My assignments</a>
+                {% else %}
+                    <a class="view-btn" href="{% url 'standalone_student_assignments' %}">My assignments</a>
+                {% endif %}
+            {% endif %}
+            <button class="view-btn ghost" type="button" data-theme-toggle aria-label="Toggle theme">☀</button>
+            {% if request.user.is_authenticated %}
+                <span class="user-chip">
+                    {{ request.user.email|default:request.user.username }}
+                    <span class="chip-divider">·</span>
+                    <a class="link" href="{% url 'standalone_logout' %}">Logout</a>
+                </span>
+            {% endif %}
+        </div>
+    </header>
+
+    <section class="section dash-compact">
+        <div class="standalone-shell">
+            {% block content %}{% endblock %}
+        </div>
+    </section>
+    <footer class="footer">
+        © {% now "Y" %} MachinaViva — All Rights Reserved
+    </footer>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const toggle = document.querySelector("[data-theme-toggle]");
+        const root = document.documentElement;
+        const applyTheme = (mode) => {
+            if (mode === "light") {
+                root.setAttribute("data-theme", "light");
+                if (toggle) toggle.textContent = "☾";
+            } else {
+                root.setAttribute("data-theme", "dark");
+                if (toggle) toggle.textContent = "☀";
+            }
+            localStorage.setItem("mv-theme", mode);
+        };
+        const saved = localStorage.getItem("mv-theme");
+        applyTheme(saved === "light" ? "light" : "dark");
+        if (toggle) {
+            toggle.addEventListener("click", () => {
+                const current = root.getAttribute("data-theme") === "light" ? "light" : "dark";
+                applyTheme(current === "light" ? "dark" : "light");
+            });
+        }
+    });
+</script>
+</body>
+</html>

@@ -187,3 +187,94 @@ body {
     background: #fff;
     border-top: 1px solid #e5e5e5;
 }
+
+/* -----------------------------------------
+   Standalone app utility styles
+----------------------------------------- */
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.vn-form {
+    display: grid;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.vn-form input,
+.vn-form textarea,
+.vn-form button {
+    padding: 10px 12px;
+    font-size: 1rem;
+    border: 1px solid #d5d5d5;
+    border-radius: 6px;
+}
+
+.vn-form button {
+    background: #4a4aff;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+.vn-form button:hover {
+    background: #3232e0;
+}
+
+.alert {
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin: 12px 0;
+    border: 1px solid #e0e0e0;
+}
+
+.alert.error {
+    border-color: #f5c0c0;
+    background: #fff2f2;
+}
+
+.alert.success {
+    border-color: #c4e6c7;
+    background: #f2fff4;
+}
+
+.vn-list {
+    list-style: none;
+    padding: 0;
+}
+
+.vn-list li {
+    background: #fff;
+    border: 1px solid #ececec;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+}
+
+.vn-list .actions {
+    margin-top: 6px;
+    font-size: 0.95rem;
+}
+
+.vn-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+}
+
+.vn-table th,
+.vn-table td {
+    border: 1px solid #e5e5e5;
+    padding: 10px;
+    text-align: left;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #ececec;
+    border-radius: 8px;
+    padding: 14px;
+    margin: 14px 0;
+}

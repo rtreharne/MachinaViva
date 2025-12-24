@@ -12,16 +12,30 @@
 <body>
 <div class="page">
 
-    <header class="nav">
+    <header class="nav nav-spread">
         <div class="brand">
             <span class="brand-mark">MV</span>
             <span>MachinaViva</span>
         </div>
-        <div class="nav-title">{{ assignment.title|default:"Viva assignment" }}</div>
+        {% if from_standalone %}
+            <div class="nav-title">{{ assignment.title|default:"Viva assignment" }}</div>
+        {% endif %}
         <div class="nav-actions view-toggle">
-            <button class="view-btn active" data-view-switch="dashboard">Dashboard</button>
-            <button class="view-btn" data-view-switch="settings">Viva settings</button>
-            <button class="view-btn ghost" type="button" data-theme-toggle aria-label="Toggle theme">Light</button>
+            {% if from_standalone %}
+                <a class="view-btn" href="{% url 'standalone_app_home' %}">My assignments</a>
+                <button class="view-btn active" data-view-switch="dashboard">Roster</button>
+                <button class="view-btn" data-view-switch="settings">Viva settings</button>
+                <button class="view-btn ghost" type="button" data-theme-toggle aria-label="Toggle theme">☀</button>
+                <span class="user-chip">
+                    {{ request.user.email|default:request.user.username }}
+                    <span class="chip-divider">·</span>
+                    <a class="link" href="{% url 'standalone_logout' %}">Logout</a>
+                </span>
+            {% else %}
+                <button class="view-btn active" data-view-switch="dashboard">Dashboard</button>
+                <button class="view-btn" data-view-switch="settings">Viva settings</button>
+                <button class="view-btn ghost" type="button" data-theme-toggle aria-label="Toggle theme">☀</button>
+            {% endif %}
         </div>
     </header>
 
@@ -29,8 +43,15 @@
         <div class="dash-view active" data-view-pane="dashboard">
             <div class="carousel">
                 <div class="carousel-pane active" data-dash-pane="table">
-                    <div class="table-controls">
-                        <input type="search" class="filter-input" placeholder="Filter students by name…" aria-label="Filter students" data-student-filter>
+                    <div class="table-controls table-controls-split">
+                        <div class="table-controls-left">
+                            {% if from_standalone %}
+                                <a class="pill neutral" href="#" data-invite-modal-open>Invite students via email</a>
+                            {% endif %}
+                        </div>
+                        <div class="table-controls-right">
+                            <input type="search" class="filter-input" placeholder="Filter students by name…" aria-label="Filter students" data-student-filter>
+                        </div>
                     </div>
                     <div class="table-card">
                         <div class="table-head">
@@ -42,7 +63,16 @@
                         {% if students %}
                             {% for student in students %}
                                 <div class="table-row" data-student-row data-student-id="{{ student.user_id }}">
-                                    <div>{{ student.name }}</div>
+                                    <div class="viva-cell">
+                                        {% if student.is_invite %}
+                                            <span class="monospace">{{ student.name }}</span>
+                                            {% if student.invite_status != "Accepted" %}
+                                                <span class="pill {% if student.invite_status == 'Expired' %}no{% else %}neutral{% endif %}">{{ student.invite_status|default:"Invited" }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            {{ student.name }}
+                                        {% endif %}
+                                    </div>
                                     <div class="viva-cell">
                                         {% if student.status == "completed" %}
                                             <span class="viva-status yes" aria-label="Completed"></span>
@@ -55,8 +85,12 @@
                                             <span class="viva-status no" aria-label="Submitted"></span>
                                             <span class="link disabled">Submitted</span>
                                         {% else %}
-                                            <span class="viva-status no" aria-label="Pending"></span>
-                                            <span class="link disabled">Pending</span>
+                                            {% if student.is_invite and student.invite_id and student.invite_status != "Accepted" %}
+                                                <a class="pill neutral" href="{% url 'standalone_invite_resend' student.invite_id %}">Re-send</a>
+                                            {% else %}
+                                                <span class="viva-status no" aria-label="Pending"></span>
+                                                <span class="link disabled">Pending</span>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
                                     <div class="flag {% if student.flags %}warn{% else %}none{% endif %}">
@@ -336,6 +370,58 @@
                     <span class="meta" data-save-status></span>
                 </div>
             </form>
+
+            {% if from_standalone %}
+            <div class="settings-grid max-two">
+                <div class="settings-form-card">
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Invite students</h3>
+                    </div>
+                    <form method="post" action="{% url 'standalone_invite_create' assignment.slug %}" class="settings-grid single-column">
+                        {% csrf_token %}
+                        <div class="settings-row">
+                            <label for="invite-email">Student email</label>
+                            <input id="invite-email" name="email" type="email" required>
+                        </div>
+                        <div class="settings-actions">
+                            <button type="submit" class="view-btn">Send invite</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="settings-form-card">
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Recent invites</h3>
+                    </div>
+                    {% if invites %}
+                        <div class="table-card">
+                            <div class="table-head cols-2">
+                                <div>Email</div>
+                                <div>Status</div>
+                            </div>
+                            {% for invite in invites %}
+                                <div class="table-row cols-2">
+                                    <div class="monospace">{{ invite.email }}</div>
+                                    <div class="inline-actions">
+                                        {% if invite.accepted_at %}
+                                            <span class="pill yes">Accepted</span>
+                                        {% else %}
+                                            {% if invite.is_expired %}
+                                                <span class="pill no">Expired</span>
+                                            {% else %}
+                                                <span class="pill neutral">Pending</span>
+                                            {% endif %}
+                                            <a class="pill neutral" href="{% url 'standalone_invite_resend' invite.id %}">Resend</a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="muted">No invites yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
         <button class="back-to-top" type="button" data-back-to-top aria-label="Back to top">↑ Top</button>
     </section>
@@ -358,6 +444,27 @@
         </div>
     </div>
 </div>
+{% if from_standalone %}
+<div class="invite-modal" data-invite-modal>
+    <div class="invite-dialog">
+        <div class="invite-head">
+            <h3>Invite students via email</h3>
+            <button class="icon-btn" type="button" data-invite-close aria-label="Close invite form">×</button>
+        </div>
+        <form method="post" action="{% url 'standalone_invite_create' assignment.slug %}" class="settings-grid single-column">
+            {% csrf_token %}
+            <div class="settings-row">
+                <label for="invite-email-modal">Student email</label>
+                <input id="invite-email-modal" name="email" type="email" required>
+            </div>
+            <div class="settings-actions">
+                <button type="submit" class="view-btn">Send invite</button>
+                <button type="button" class="view-btn ghost" data-invite-close>Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 <script>
     (() => {
         const unlimited = document.getElementById("unlimited_attempts");
@@ -373,6 +480,26 @@
         };
         unlimited.addEventListener("change", toggle);
         toggle();
+    })();
+
+    (() => {
+        const openBtn = document.querySelector("[data-invite-modal-open]");
+        const modal = document.querySelector("[data-invite-modal]");
+        const closes = document.querySelectorAll("[data-invite-close]");
+        if (!openBtn || !modal) return;
+        const open = (e) => {
+            e?.preventDefault();
+            modal.classList.add("open");
+        };
+        const close = (e) => {
+            e?.preventDefault();
+            modal.classList.remove("open");
+        };
+        openBtn.addEventListener("click", open);
+        closes.forEach(btn => btn.addEventListener("click", close));
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) close();
+        });
     })();
 </script>
 </body>

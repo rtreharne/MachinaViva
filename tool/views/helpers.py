@@ -14,7 +14,7 @@ def is_student_role(roles):
 
 import time, jwt, requests
 from django.conf import settings
-from tool.models import ToolConfig
+from tool.models import ToolConfig, UserProfile
 
 
 def fetch_nrps_roster(nrps_url):
@@ -95,3 +95,34 @@ def fetch_nrps_roster(nrps_url):
     except:
         print("DEBUG: JSON ERROR - returning None")
         return None
+
+
+def user_role_labels(user):
+    """
+    Map a Django user/profile to LTI-like role labels used elsewhere.
+    """
+    try:
+        profile = user.profile
+    except Exception:
+        return []
+    if profile.role == UserProfile.ROLE_INSTRUCTOR:
+        return ["Instructor"]
+    return ["Learner"]
+
+
+def set_standalone_session(request, user, assignment, force_instructor=False):
+    """
+    Populate session keys expected by existing LTI views so standalone flows
+    can reuse the same assignment/submission/viva handlers.
+    """
+    roles = user_role_labels(user)
+    if force_instructor and "Instructor" not in roles:
+        roles = ["Instructor"]
+
+    request.session["lti_roles"] = roles
+    request.session["lti_user_id"] = str(user.id)
+    request.session["lti_user_name"] = user.get_full_name() or user.email or user.username
+    request.session["lti_resource_link_id"] = assignment.slug
+    request.session["lti_course_name"] = assignment.title
+    request.session["nrps_url"] = None
+    request.session["lti_claims"] = {}

@@ -772,10 +772,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const applyTheme = (mode) => {
             if (mode === "light") {
                 root.setAttribute("data-theme", "light");
-                themeToggle.textContent = "Dark";
+                themeToggle.textContent = "☾";
             } else {
                 root.setAttribute("data-theme", "dark");
-                themeToggle.textContent = "Light";
+                themeToggle.textContent = "☀";
             }
             localStorage.setItem("mv-theme", mode);
         };

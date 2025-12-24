@@ -1,0 +1,80 @@
+{% extends "tool/standalone_base.html" %}
+{% block page_title %}Instructor signup{% endblock %}
+{% block content %}
+<div class="standalone-center">
+    <div class="settings-form-card standalone-narrow">
+        <h2>Instructor signup</h2>
+        {% if error %}
+            <div class="alert error">{{ error }}</div>
+        {% endif %}
+        <form method="post" class="settings-grid single-column">
+            {% csrf_token %}
+            <div class="settings-row">
+                <label for="name">Name</label>
+                <input id="name" name="name" type="text" placeholder="Your name">
+            </div>
+            <div class="settings-row">
+                <label for="email">Work email</label>
+                <input id="email" name="email" type="email" required>
+            </div>
+            <div class="settings-row">
+                <label for="institution_type">Institution type</label>
+                <select id="institution_type" name="institution_type" required data-institution-type>
+                    <option value="" selected disabled>Select type</option>
+                    {% for type in institution_types %}
+                        <option value="{{ type }}">{{ type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="settings-row" data-he-select-row>
+                <label for="he_institution">Higher Education institution</label>
+                <select id="he_institution" data-he-select>
+                    {% for inst in uk_he_institutions %}
+                        <option value="{{ inst }}">{{ inst }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="settings-row" data-institution-name-row>
+                <label for="institution_name">Institution name</label>
+                <input id="institution_name" name="institution_name" type="text" placeholder="Institution name">
+            </div>
+            <div class="settings-row">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" required>
+            </div>
+            <div class="settings-actions">
+                <button type="submit" class="view-btn">Create instructor account</button>
+            </div>
+        </form>
+        <p class="muted center-text signup-hint"><a class="link" href="{% url 'standalone_login' %}">Login with existing account</a></p>
+    </div>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const typeSelect = document.querySelector("[data-institution-type]");
+        const heRow = document.querySelector("[data-he-select-row]");
+        const heSelect = document.querySelector("[data-he-select]");
+        const nameRow = document.querySelector("[data-institution-name-row]");
+        const nameInput = document.getElementById("institution_name");
+
+        const syncFields = () => {
+            const val = (typeSelect?.value || "").trim();
+            const isHE = val === "Higher Education";
+            if (heRow) heRow.classList.toggle("hidden-row", !isHE);
+            if (nameRow) nameRow.classList.toggle("hidden-row", isHE);
+            if (isHE && heSelect && nameInput) {
+                nameInput.value = heSelect.value || "";
+            } else if (nameInput && !isHE) {
+                nameInput.value = nameInput.value; // keep user entry
+            }
+        };
+
+        typeSelect?.addEventListener("change", syncFields);
+        heSelect?.addEventListener("change", () => {
+            if (nameInput) nameInput.value = heSelect.value || "";
+        });
+
+        syncFields();
+    });
+</script>
+{% endblock %}

@@ -13,3 +13,18 @@ from .submission import (
 from .nrps_test import nrps_test
 from .viva import viva_start, viva_session, viva_send_message, viva_toggle_submission, viva_toggle_resource, viva_log_event, viva_summary, viva_logs
 from .home import home
+from .standalone import (
+    standalone_signup,
+    standalone_login,
+    standalone_logout,
+    standalone_app_home,
+    standalone_assignment_create,
+    standalone_assignment_entry,
+    standalone_invites,
+    standalone_invite_resend,
+    standalone_invite_create,
+    accept_invite,
+    standalone_student_assignments,
+    standalone_student_entry,
+    verify_instructor,
+)
