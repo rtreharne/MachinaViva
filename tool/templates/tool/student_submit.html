@@ -37,7 +37,7 @@
     <script defer src="{% static 'tool/student_dashboard.js' %}?v={{ cachebust }}"></script>
 </head>
 <body>
-<div class="page"
+<div class="page page-with-footer"
      data-viva-status="{{ viva_status|default:'pending' }}"
      {% if session %}data-viva-session-id="{{ session.id }}"{% endif %}
      data-viva-duration="{{ assignment.viva_duration_seconds|default:600 }}"
@@ -146,6 +146,7 @@
                 </div>
                 </div>
 
+                {% if assignment_resources %}
                 <div class="settings-row">
                     <label>Viva files (instructor)</label>
                     <div class="submission-table-wrap" data-instructor-resources>
@@ -192,10 +193,8 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="meta {% if assignment_resources %}is-hidden{% endif %}">
-                        No instructor files yet.
-                    </div>
                 </div>
+                {% endif %}
 
                 <div class="settings-row">
                     <label>Your uploads</label>
@@ -337,7 +336,7 @@
     </section>
 
     <footer class="footer">
-        <p>© {{ now|date:"Y" }} MachinaViva · Authentic viva assessments for the AI era.</p>
+        <p>© 2025 MachinaViva · Authentic viva assessments for the AI era.</p>
     </footer>
 </div>
 

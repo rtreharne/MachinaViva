@@ -10,7 +10,7 @@
     <script defer src="{% static 'tool/teacher_dashboard.js' %}?v={{ cachebust }}"></script>
 </head>
 <body>
-<div class="page">
+<div class="page page-with-footer">
 
     <header class="nav nav-spread">
         <div class="brand">
@@ -46,11 +46,11 @@
                     <div class="table-controls table-controls-split">
                         <div class="table-controls-left">
                             {% if from_standalone %}
-                                <a class="pill neutral" href="#" data-invite-modal-open>Invite students via email</a>
+                                <a class="pill neutral" href="#" data-access-modal-open>Manage access</a>
                             {% endif %}
                         </div>
                         <div class="table-controls-right">
-                            <input type="search" class="filter-input" placeholder="Filter students by name…" aria-label="Filter students" data-student-filter>
+                            <input type="search" class="filter-input" placeholder="Filter students by name..." aria-label="Filter students" data-student-filter>
                         </div>
                     </div>
                     <div class="table-card">
@@ -381,63 +381,12 @@
                 </div>
             </form>
 
-            {% if from_standalone %}
-            <div class="settings-grid max-two">
-                <div class="settings-form-card">
-                    <div class="settings-card-head">
-                        <h3 class="settings-title">Invite students</h3>
-                    </div>
-                    <form method="post" action="{% url 'standalone_invite_create' assignment.slug %}" class="settings-grid single-column">
-                        {% csrf_token %}
-                        <div class="settings-row">
-                            <label for="invite-email">Student email</label>
-                            <input id="invite-email" name="email" type="email" required>
-                        </div>
-                        <div class="settings-actions">
-                            <button type="submit" class="view-btn">Send invite</button>
-                        </div>
-                    </form>
-                </div>
-                <div class="settings-form-card">
-                    <div class="settings-card-head">
-                        <h3 class="settings-title">Recent invites</h3>
-                    </div>
-                    {% if invites %}
-                        <div class="table-card">
-                            <div class="table-head cols-2">
-                                <div>Email</div>
-                                <div>Status</div>
-                            </div>
-                            {% for invite in invites %}
-                                <div class="table-row cols-2">
-                                    <div class="monospace">{{ invite.email }}</div>
-                                    <div class="inline-actions">
-                                        {% if invite.accepted_at %}
-                                            <span class="pill yes">Accepted</span>
-                                        {% else %}
-                                            {% if invite.is_expired %}
-                                                <span class="pill no">Expired</span>
-                                            {% else %}
-                                                <span class="pill neutral">Pending</span>
-                                            {% endif %}
-                                            <a class="pill neutral" href="{% url 'standalone_invite_resend' invite.id %}">Resend</a>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="muted">No invites yet.</p>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
         </div>
         <button class="back-to-top" type="button" data-back-to-top aria-label="Back to top">↑ Top</button>
     </section>
 
     <footer class="footer">
-        <p>© {{ now|date:"Y" }} MachinaViva · Authentic viva assessments for the AI era.</p>
+        <p>© 2025 MachinaViva · Authentic viva assessments for the AI era.</p>
     </footer>
 </div>
 
@@ -455,23 +404,99 @@
     </div>
 </div>
 {% if from_standalone %}
-<div class="invite-modal" data-invite-modal>
+<div class="invite-modal" data-access-modal>
     <div class="invite-dialog">
         <div class="invite-head">
-            <h3>Invite students via email</h3>
-            <button class="icon-btn" type="button" data-invite-close aria-label="Close invite form">×</button>
+            <h3>Manage access</h3>
+            <button class="icon-btn" type="button" data-access-modal-close aria-label="Close access settings">×</button>
         </div>
-        <form method="post" action="{% url 'standalone_invite_create' assignment.slug %}" class="settings-grid single-column">
-            {% csrf_token %}
-            <div class="settings-row">
-                <label for="invite-email-modal">Student email</label>
-                <input id="invite-email-modal" name="email" type="email" required>
+        <div class="settings-grid single-column">
+            <div class="settings-form-card">
+                <div class="settings-card-head">
+                    <h3 class="settings-title">Invite students</h3>
+                </div>
+                <form method="post" action="{% url 'standalone_invite_create' assignment.slug %}" class="settings-grid single-column">
+                    {% csrf_token %}
+                    <div class="settings-row">
+                        <label for="invite-email">Student email</label>
+                        <input id="invite-email" name="email" type="email" required>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="view-btn">Send invite</button>
+                    </div>
+                </form>
+                <div class="settings-row">
+                    <details class="invite-details">
+                        <summary>
+                            Recent invites{% if invites %} ({{ invites|length }}){% endif %}
+                        </summary>
+                        {% if invites %}
+                            <div class="table-card">
+                                <div class="table-head cols-2">
+                                    <div>Email</div>
+                                    <div>Status</div>
+                                </div>
+                                {% for invite in invites %}
+                                    <div class="table-row cols-2">
+                                        <div class="monospace">{{ invite.email }}</div>
+                                        <div class="inline-actions">
+                                            {% if invite.accepted_at %}
+                                                <span class="pill yes">Accepted</span>
+                                            {% else %}
+                                                {% if invite.is_expired %}
+                                                    <span class="pill no">Expired</span>
+                                                {% else %}
+                                                    <span class="pill neutral">Pending</span>
+                                                {% endif %}
+                                                <a class="pill neutral" href="{% url 'standalone_invite_resend' invite.id %}">Resend</a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="muted">No invites yet.</p>
+                        {% endif %}
+                    </details>
+                </div>
             </div>
-            <div class="settings-actions">
-                <button type="submit" class="view-btn">Send invite</button>
-                <button type="button" class="view-btn ghost" data-invite-close>Cancel</button>
+            <div class="settings-form-card">
+                <div class="settings-card-head">
+                    <h3 class="settings-title">Self-enrol link</h3>
+                </div>
+                <form method="post" action="{% url 'standalone_self_enroll_manage' assignment.slug %}" class="settings-grid single-column">
+                    {% csrf_token %}
+                    <div class="settings-row">
+                        <label for="self-enroll-link">Share link</label>
+                        <input id="self-enroll-link" type="text" value="{{ self_enroll_link }}" readonly data-self-enroll-link>
+                        <div class="meta">Share this link so students can self-enrol.</div>
+                    </div>
+                    <div class="settings-row">
+                        <label for="self-enroll-domain">Allowed email domain (optional)</label>
+                        <input id="self-enroll-domain" name="self_enroll_domain" type="text" value="{{ assignment.self_enroll_domain }}" placeholder="example.edu">
+                        <div class="meta">Leave blank to allow any domain.</div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="button" class="view-btn ghost" data-copy-target="self-enroll-link">Copy link</button>
+                        <button type="submit" class="view-btn">Save domain</button>
+                        <button type="submit" class="view-btn ghost" name="action" value="regenerate">Regenerate link</button>
+                    </div>
+                </form>
             </div>
-        </form>
+            <div class="settings-form-card">
+                <div class="settings-card-head">
+                    <h3 class="settings-title">Embed code</h3>
+                </div>
+                <div class="settings-row">
+                    <label for="self-enroll-iframe">Iframe snippet</label>
+                    <textarea id="self-enroll-iframe" rows="4" readonly>{{ self_enroll_iframe|safe }}</textarea>
+                    <div class="meta">Paste this into your course site to embed self-enrol.</div>
+                </div>
+                <div class="settings-actions">
+                    <button type="button" class="view-btn ghost" data-copy-target="self-enroll-iframe">Copy iframe</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -492,25 +517,6 @@
         toggle();
     })();
 
-    (() => {
-        const openBtn = document.querySelector("[data-invite-modal-open]");
-        const modal = document.querySelector("[data-invite-modal]");
-        const closes = document.querySelectorAll("[data-invite-close]");
-        if (!openBtn || !modal) return;
-        const open = (e) => {
-            e?.preventDefault();
-            modal.classList.add("open");
-        };
-        const close = (e) => {
-            e?.preventDefault();
-            modal.classList.remove("open");
-        };
-        openBtn.addEventListener("click", open);
-        closes.forEach(btn => btn.addEventListener("click", close));
-        modal.addEventListener("click", (e) => {
-            if (e.target === modal) close();
-        });
-    })();
 </script>
 </body>
 </html>

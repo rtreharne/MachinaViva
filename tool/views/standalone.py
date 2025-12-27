@@ -192,6 +192,36 @@ def _generate_slug(title: str) -> str:
     return secrets.token_hex(8)
 
 
+def _generate_self_enroll_token() -> str:
+    for _ in range(5):
+        token = secrets.token_urlsafe(24)
+        if not Assignment.objects.filter(self_enroll_token=token).exists():
+            return token
+    return secrets.token_urlsafe(32)
+
+
+def _normalize_domain(value: str) -> str:
+    if not value:
+        return ""
+    domain = value.strip().lower()
+    if domain.startswith("@"):
+        domain = domain[1:]
+    return domain
+
+
+def _email_domain(email: str) -> str:
+    if not email:
+        return ""
+    parts = email.strip().lower().rsplit("@", 1)
+    return parts[1] if len(parts) == 2 else ""
+
+
+def _domain_allowed(email: str, allowed_domain: str) -> bool:
+    if not allowed_domain:
+        return True
+    return _email_domain(email) == _normalize_domain(allowed_domain)
+
+
 def standalone_signup(request):
     """
     Instructor-only signup.
@@ -359,6 +389,123 @@ def standalone_assignment_entry(request, slug):
     set_standalone_session(request, request.user, assignment, force_instructor=True)
     request.session["standalone_from_dashboard"] = True
     return redirect("assignment_view")
+
+
+@login_required
+def standalone_self_enroll_manage(request, slug):
+    assignment = get_object_or_404(Assignment, slug=slug, owner=request.user)
+    try:
+        profile = request.user.profile
+    except Exception:
+        return redirect("standalone_login")
+    if profile.role != UserProfile.ROLE_INSTRUCTOR:
+        return redirect("standalone_student_assignments")
+    if request.method != "POST":
+        return redirect("assignment_view")
+
+    domain_raw = request.POST.get("self_enroll_domain", "")
+    assignment.self_enroll_domain = _normalize_domain(domain_raw)
+    action = request.POST.get("action") or ""
+    if action == "regenerate" or not assignment.self_enroll_token:
+        assignment.self_enroll_token = _generate_self_enroll_token()
+
+    assignment.save(update_fields=["self_enroll_domain", "self_enroll_token"])
+    set_standalone_session(request, request.user, assignment, force_instructor=True)
+    request.session["standalone_from_dashboard"] = True
+    return redirect("assignment_view")
+
+
+def standalone_self_enroll(request, token):
+    assignment = get_object_or_404(Assignment, self_enroll_token=token)
+    allowed_domain = _normalize_domain(assignment.self_enroll_domain)
+    error = None
+    logged_in_user = ""
+
+    if request.user.is_authenticated:
+        logged_in_user = request.user.email or request.user.username or ""
+        try:
+            profile = request.user.profile
+        except Exception:
+            profile = None
+        if profile and profile.role == UserProfile.ROLE_INSTRUCTOR:
+            error = "This link is for students. Please log in with a student account."
+        elif allowed_domain and not _domain_allowed(logged_in_user, allowed_domain):
+            error = f"Email must end with @{allowed_domain} to join this assignment."
+        else:
+            _ensure_profile(request.user, UserProfile.ROLE_STUDENT)
+            AssignmentMembership.objects.get_or_create(
+                assignment=assignment,
+                user=request.user,
+                defaults={"role": AssignmentMembership.ROLE_STUDENT},
+            )
+            set_standalone_session(request, request.user, assignment, force_instructor=False)
+            return redirect("assignment_view")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        name = (request.POST.get("name") or "").strip()
+        email = (request.POST.get("email") or "").strip().lower()
+        password = (request.POST.get("password") or "").strip()
+        user = None
+
+        if not email or not password:
+            error = "Email and password are required."
+        elif allowed_domain and not _domain_allowed(email, allowed_domain):
+            error = f"Email must end with @{allowed_domain} to join this assignment."
+        elif action == "register":
+            if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
+                error = "An account with that email already exists. Please log in."
+            else:
+                try:
+                    user = User.objects.create_user(username=email, email=email, password=password)
+                except IntegrityError:
+                    error = "An account with that email already exists. Please log in."
+                    user = None
+                if user and name:
+                    parts = name.split(" ", 1)
+                    user.first_name = parts[0]
+                    if len(parts) > 1:
+                        user.last_name = parts[1]
+                    user.save(update_fields=["first_name", "last_name"])
+                if user:
+                    _ensure_profile(user, UserProfile.ROLE_STUDENT)
+        elif action == "login":
+            try:
+                existing = User.objects.get(email__iexact=email)
+                user = authenticate(request, username=existing.username, password=password)
+            except User.DoesNotExist:
+                user = authenticate(request, username=email, password=password)
+            if not user:
+                error = "Invalid email or password."
+            else:
+                try:
+                    profile = user.profile
+                except Exception:
+                    profile = None
+                if profile and profile.role == UserProfile.ROLE_INSTRUCTOR:
+                    error = "This link is for students. Please log in with a student account."
+                    user = None
+                else:
+                    _ensure_profile(user, UserProfile.ROLE_STUDENT)
+        else:
+            error = "Choose login or register."
+
+        if user and not error:
+            login(request, user)
+            AssignmentMembership.objects.get_or_create(
+                assignment=assignment,
+                user=user,
+                defaults={"role": AssignmentMembership.ROLE_STUDENT},
+            )
+            set_standalone_session(request, user, assignment, force_instructor=False)
+            return redirect("assignment_view")
+
+    return render(request, "tool/standalone_self_enroll.html", {
+        "assignment": assignment,
+        "allowed_domain": allowed_domain,
+        "error": error,
+        "logged_in_user": logged_in_user,
+    })
 
 
 @login_required

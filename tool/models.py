@@ -61,6 +61,8 @@ class Assignment(models.Model):
     arrhythmic_typing = models.BooleanField(default=True)
     enable_model_answers = models.BooleanField(default=True)
     allow_student_resource_toggle = models.BooleanField(default=False)
+    self_enroll_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    self_enroll_domain = models.CharField(max_length=255, blank=True, default="")
 
 
     def __str__(self):

@@ -31,6 +31,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const resourceEmpty = document.querySelector("[data-resource-empty]");
     const backBtn = document.querySelector("[data-transcript-back]");
     const backToTop = document.querySelector("[data-back-to-top]");
+    const copyButtons = document.querySelectorAll("[data-copy-target]");
+    const accessModal = document.querySelector("[data-access-modal]");
+    const accessModalOpen = document.querySelector("[data-access-modal-open]");
+    const accessModalClose = document.querySelectorAll("[data-access-modal-close]");
     const themeToggle = document.querySelector("[data-theme-toggle]");
     const settingsForm = document.querySelector("[data-settings-form]");
     const saveStatus = document.querySelector("[data-save-status]");
@@ -807,6 +811,87 @@ document.addEventListener("DOMContentLoaded", () => {
         themeToggle.addEventListener("click", () => {
             const current = root.getAttribute("data-theme") === "light" ? "light" : "dark";
             applyTheme(current === "light" ? "dark" : "light");
+        });
+    }
+
+    if (copyButtons.length) {
+        const copyText = async (text) => {
+            if (!text) return false;
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (err) {
+                return false;
+            }
+            return false;
+        };
+        const fallbackCopy = (text) => {
+            if (!text) return false;
+            const temp = document.createElement("textarea");
+            temp.value = text;
+            temp.setAttribute("readonly", "readonly");
+            temp.style.position = "absolute";
+            temp.style.left = "-9999px";
+            document.body.appendChild(temp);
+            temp.select();
+            let copied = false;
+            try {
+                copied = document.execCommand("copy");
+            } catch (err) {
+                copied = false;
+            }
+            document.body.removeChild(temp);
+            return copied;
+        };
+
+        copyButtons.forEach((btn) => {
+            const originalLabel = btn.textContent;
+            btn.dataset.copyLabel = originalLabel;
+            btn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                const targetId = btn.dataset.copyTarget;
+                const targetEl = targetId ? document.getElementById(targetId) : null;
+                if (!targetEl) return;
+                const text = "value" in targetEl ? targetEl.value : (targetEl.textContent || "");
+                if (!text) return;
+                let copied = await copyText(text);
+                if (!copied) {
+                    copied = fallbackCopy(text);
+                }
+                if (copied) {
+                    btn.textContent = "Copied";
+                    btn.dataset.copied = "true";
+                    setTimeout(() => {
+                        if (btn.dataset.copied) {
+                            btn.textContent = btn.dataset.copyLabel || originalLabel;
+                            btn.dataset.copied = "";
+                        }
+                    }, 1600);
+                }
+            });
+        });
+    }
+
+    if (accessModal && accessModalOpen) {
+        const openAccessModal = (e) => {
+            e?.preventDefault();
+            accessModal.classList.add("open");
+        };
+        const closeAccessModal = (e) => {
+            e?.preventDefault();
+            accessModal.classList.remove("open");
+        };
+        accessModalOpen.addEventListener("click", openAccessModal);
+        accessModalClose.forEach(btn => btn.addEventListener("click", closeAccessModal));
+        accessModal.addEventListener("click", (e) => {
+            if (e.target === accessModal) closeAccessModal(e);
+        });
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && accessModal.classList.contains("open")) {
+                closeAccessModal(e);
+            }
         });
     }
 

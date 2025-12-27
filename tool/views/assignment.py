@@ -1,11 +1,21 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.urls import reverse
 from .helpers import is_instructor_role, is_admin_role, fetch_nrps_roster
 from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaFeedback, VivaSessionSubmission, InteractionLog, AssignmentResource, AssignmentResourcePreference, VivaSessionResource, AssignmentInvitation, AssignmentMembership
 from datetime import datetime
 from django.utils.timezone import now
 from .viva import compute_integrity_flags
 import json
+import secrets
+
+
+def _generate_self_enroll_token():
+    for _ in range(5):
+        token = secrets.token_urlsafe(24)
+        if not Assignment.objects.filter(self_enroll_token=token).exists():
+            return token
+    return secrets.token_urlsafe(32)
 
 
 def assignment_edit(request):
@@ -307,6 +317,7 @@ def assignment_view(request):
                     })
 
         pending_invites = []
+        invites = []
         accepted_invite_user_ids = set()
         invite_qs_pending = []
         if from_standalone:
@@ -320,6 +331,10 @@ def assignment_view(request):
                     "status": "Expired" if inv.is_expired else "Pending",
                     "invite_id": inv.id,
                 })
+
+            invites = list(AssignmentInvitation.objects.filter(
+                assignment=assignment,
+            ).order_by("-created_at"))
 
             invite_qs_accepted = AssignmentInvitation.objects.filter(
                 assignment=assignment,
@@ -550,13 +565,28 @@ def assignment_view(request):
                 })
 
             # Float accepted invites to the top, then invited, then others
-            students = sorted(
-                students,
-                key=lambda s: (
-                    0 if s.get("accepted_invite") else (1 if s.get("is_invite") else 2),
-                    s.get("name", "").lower(),
+                students = sorted(
+                    students,
+                    key=lambda s: (
+                        0 if s.get("accepted_invite") else (1 if s.get("is_invite") else 2),
+                        s.get("name", "").lower(),
+                    )
                 )
-            )
+
+        self_enroll_link = ""
+        self_enroll_iframe = ""
+        if from_standalone and request.user.is_authenticated and assignment.owner_id == request.user.id:
+            if not assignment.self_enroll_token:
+                assignment.self_enroll_token = _generate_self_enroll_token()
+                assignment.save(update_fields=["self_enroll_token"])
+            if assignment.self_enroll_token:
+                self_enroll_link = request.build_absolute_uri(
+                    reverse("standalone_self_enroll", args=[assignment.self_enroll_token])
+                )
+                self_enroll_iframe = (
+                    f'<iframe src="{self_enroll_link}" width="100%" height="700" '
+                    f'style="border:0;" title="MachinaViva self-enrol"></iframe>'
+                )
 
         return render(request, "tool/teacher_dashboard.html", {
             "assignment": assignment,
@@ -569,6 +599,9 @@ def assignment_view(request):
             "resources_total_size": resources_total_size,
             "from_standalone": from_standalone,
             "pending_invites": pending_invites,
+            "self_enroll_link": self_enroll_link,
+            "self_enroll_iframe": self_enroll_iframe,
+            "invites": invites,
         })
 
     # --------------------------------------------------------------

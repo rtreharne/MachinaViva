@@ -21,6 +21,7 @@ from .standalone import (
     standalone_app_home,
     standalone_assignment_create,
     standalone_assignment_entry,
+    standalone_self_enroll_manage,
     standalone_invites,
     standalone_invite_resend,
     standalone_invite_create,
@@ -28,5 +29,6 @@ from .standalone import (
     standalone_student_assignments,
     standalone_student_entry,
     standalone_invite_accept_logged_in,
+    standalone_self_enroll,
     verify_instructor,
 )
