@@ -1,6 +1,6 @@
 databases:
   - name: vivanoodle-db
-    plan: basic
+    plan: basic-256mb
     databaseName: vivanoodle
     user: vivanoodle
 
