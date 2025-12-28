@@ -9,7 +9,6 @@ services:
     name: vivanoodle
     env: python
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
-    releaseCommand: "python manage.py migrate --noinput"
     startCommand: "gunicorn lti.wsgi:application"
     envVars:
       - key: DEBUG
@@ -64,8 +63,3 @@ services:
       name: media
       mountPath: /var/data
       sizeGB: 10
-    secretFiles:
-      - name: lti-private-key
-        mountPath: /etc/secrets/lti_private.pem
-      - name: lti-public-key
-        mountPath: /etc/secrets/lti_public.pem
