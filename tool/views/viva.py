@@ -3,12 +3,13 @@ import os
 import re
 
 from django.shortcuts import render, redirect
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 
 from openai import OpenAI
 from tool.models import Submission, VivaSession, VivaSessionSubmission, InteractionLog, VivaMessage, AssignmentResource, AssignmentResourcePreference, VivaSessionResource
+from .helpers import is_instructor_role, is_admin_role
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
@@ -43,6 +44,12 @@ MODEL_ANSWER_SYSTEM_PROMPT = """Write a concise exemplar answer (2-4 sentences) 
 Ground it only in the submission materials provided. Do not invent details.
 If the materials are insufficient, say so briefly and answer as generally as possible without adding new claims.
 Return only the answer text, with no labels or JSON."""
+
+FEEDBACK_SYSTEM_PROMPT = """You are an academic examiner providing feedback after a student's text-based viva.
+Write a single, concise paragraph of feedback (4-6 sentences).
+Focus on understanding, evidence, clarity, and any gaps to address next time.
+Do not mention AI, integrity signals, or the system.
+Do not use bullet points or labels."""
 
 MAX_CONTEXT_CHARS = 12000
 MAX_FILE_CHARS = 4000
@@ -224,6 +231,49 @@ def generate_viva_reply(session):
     if not model_answer:
         model_answer = FALLBACK_MODEL_ANSWER
     return question, model_answer
+
+
+def generate_viva_feedback(session):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing OPENAI_API_KEY")
+
+    assignment = session.submission.assignment
+    submission_context = build_submission_context(session)
+    history = list(VivaMessage.objects.filter(session=session).order_by("timestamp"))
+    if MAX_HISTORY_MESSAGES and len(history) > MAX_HISTORY_MESSAGES:
+        history = history[-MAX_HISTORY_MESSAGES:]
+    transcript_lines = []
+    for msg in history:
+        speaker = "AI" if (msg.sender or "").lower() == "ai" else "Student"
+        transcript_lines.append(f"{speaker}: {msg.text}")
+    transcript = "\n".join(transcript_lines) if transcript_lines else "No transcript available."
+    assignment_title = assignment.title or "Untitled assignment"
+    assignment_desc = assignment.description or ""
+    viva_instructions = (assignment.viva_instructions or "").strip()
+    additional_prompts = (assignment.additional_prompts or "").strip()
+
+    messages = [
+        {"role": "system", "content": FEEDBACK_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                f"Assignment: {assignment_title}\n"
+                f"Description: {assignment_desc}\n\n"
+                f"Viva instructions: {viva_instructions or 'None'}\n"
+                f"Additional prompts: {additional_prompts or 'None'}\n\n"
+                f"Submission materials:\n{submission_context}\n\n"
+                f"Viva transcript:\n{transcript}"
+            ),
+        },
+    ]
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=messages,
+        temperature=0.3,
+    )
+    return (response.choices[0].message.content or "").strip()
 
 
 # ---------------------------------------------------------
@@ -425,9 +475,6 @@ def viva_send_message(request):
 
     if ended:
         session.ended_at = now()
-        feedback_text = payload.get("feedback_text")
-        if feedback_text is not None:
-            session.feedback_text = feedback_text
         if duration_seconds is not None:
             try:
                 session.duration_seconds = int(duration_seconds)
@@ -436,13 +483,36 @@ def viva_send_message(request):
         if session.started_at and session.duration_seconds is None:
             session.duration_seconds = int((session.ended_at - session.started_at).total_seconds())
         update_fields.extend(["ended_at", "duration_seconds"])
-        if feedback_text is not None:
-            update_fields.append("feedback_text")
         session.save(update_fields=update_fields)
     elif update_fields:
         session.save(update_fields=update_fields)
 
-    if ended or rating is not None or sender.lower() != "student" or not text:
+    if ended:
+        feedback_text = session.feedback_text or ""
+        if not feedback_text:
+            try:
+                feedback_text = generate_viva_feedback(session)
+            except Exception:
+                feedback_text = ""
+            if feedback_text:
+                session.feedback_text = feedback_text
+                session.save(update_fields=["feedback_text"])
+
+        assignment = session.submission.assignment
+        feedback_visible = assignment.feedback_visibility == "immediate" or (
+            assignment.feedback_visibility == "after_review" and assignment.feedback_released_at
+        )
+        if assignment.feedback_visibility == "hidden":
+            feedback_visible = False
+
+        return JsonResponse({
+            "status": "ok",
+            "message_id": msg.id if msg else None,
+            "feedback_text": feedback_text if feedback_visible else "",
+            "feedback_visible": feedback_visible,
+        })
+
+    if rating is not None or sender.lower() != "student" or not text:
         return JsonResponse({
             "status": "ok",
             "message_id": msg.id if msg else None,
@@ -478,6 +548,38 @@ def viva_send_message(request):
         response_payload["error"] = error_message
 
     return JsonResponse(response_payload, status=500 if status == "error" else 200)
+
+
+def viva_feedback_update(request, session_id):
+    roles = request.session.get("lti_roles", [])
+    if not (is_instructor_role(roles) or is_admin_role(roles)):
+        return HttpResponse("Forbidden", status=403)
+
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST required")
+
+    try:
+        session = VivaSession.objects.select_related("submission__assignment").get(id=session_id)
+    except VivaSession.DoesNotExist:
+        return HttpResponseBadRequest("Invalid viva session ID")
+
+    resource_link_id = request.session.get("lti_resource_link_id")
+    if resource_link_id and session.submission.assignment.slug != resource_link_id:
+        return HttpResponse("Forbidden", status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except Exception:
+        payload = request.POST
+
+    teacher_feedback = (payload.get("teacher_feedback") or "").strip()
+    session.teacher_feedback_text = teacher_feedback
+    session.save(update_fields=["teacher_feedback_text"])
+
+    return JsonResponse({
+        "status": "ok",
+        "teacher_feedback": teacher_feedback,
+    })
 
 
 @csrf_exempt

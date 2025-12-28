@@ -41,6 +41,11 @@ class Assignment(models.Model):
         default="immediate",
         help_text="When students can see AI feedback: immediate, after_review, or hidden."
     )
+    feedback_released_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When AI feedback was released to students (for after_review mode)."
+    )
 
     allow_student_report = models.BooleanField(
         default=True,
@@ -114,6 +119,7 @@ class VivaSession(models.Model):
     ended_at = models.DateTimeField(null=True, blank=True)
     duration_seconds = models.IntegerField(null=True, blank=True)  # optional
     feedback_text = models.TextField(blank=True)
+    teacher_feedback_text = models.TextField(blank=True)
     rating = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
@@ -245,6 +251,11 @@ class AssignmentInvitation(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name="invitations")
     email = models.EmailField()
     token = models.CharField(max_length=64, unique=True)
+    role = models.CharField(
+        max_length=20,
+        choices=AssignmentMembership.ROLE_CHOICES,
+        default=AssignmentMembership.ROLE_STUDENT,
+    )
     invited_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

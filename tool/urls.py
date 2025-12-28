@@ -39,6 +39,7 @@ urlpatterns = [
     # NEW — Internal Assignment Editing (no deep linking)
     path("assignment/edit/", views.assignment_edit, name="assignment_edit"),
     path("assignment/edit/save/", views.assignment_edit_save, name="assignment_edit_save"),
+    path("assignment/feedback/release/", views.assignment_feedback_release, name="assignment_feedback_release"),
 
     # Student Submission
     path("submit_text/", views.submit_text, name="submit_text"),
@@ -58,6 +59,7 @@ urlpatterns = [
     path("viva/start/<int:submission_id>/", views.viva_start, name="viva_start"),
     path("viva/session/<int:session_id>/", views.viva_session, name="viva_session"),
     path("viva/send/", views.viva_send_message, name="viva_send_message"),
+    path("viva/feedback/<int:session_id>/", views.viva_feedback_update, name="viva_feedback_update"),
     path("viva/toggle_submission/", views.viva_toggle_submission, name="viva_toggle_submission"),
     path("viva/toggle_resource/", views.viva_toggle_resource, name="viva_toggle_resource"),
     path("viva/log/", views.viva_log_event, name="viva_log_event"),

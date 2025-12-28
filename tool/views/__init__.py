@@ -1,6 +1,6 @@
 from .launch import index, lti_login, lti_launch, jwks, landing
 from .deeplink import deeplink, deeplink_submit
-from .assignment import assignment_view, assignment_edit, assignment_edit_save
+from .assignment import assignment_view, assignment_edit, assignment_edit_save, assignment_feedback_release
 from .submission import (
     submit_text,
     submit_file,
@@ -12,7 +12,7 @@ from .submission import (
     delete_assignment_resource,
 )
 from .nrps_test import nrps_test
-from .viva import viva_start, viva_session, viva_send_message, viva_toggle_submission, viva_toggle_resource, viva_log_event, viva_summary, viva_logs
+from .viva import viva_start, viva_session, viva_send_message, viva_toggle_submission, viva_toggle_resource, viva_log_event, viva_summary, viva_logs, viva_feedback_update
 from .home import home
 from .standalone import (
     standalone_signup,

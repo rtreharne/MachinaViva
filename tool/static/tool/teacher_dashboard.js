@@ -18,6 +18,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const transcriptEvents = document.querySelector("[data-transcript-events]");
     const transcriptDuration = document.querySelector("[data-transcript-duration]");
     const transcriptFiles = document.querySelector("[data-transcript-files]");
+    const aiFeedbackEl = document.querySelector("[data-ai-feedback]");
+    const teacherFeedbackForm = document.querySelector("[data-teacher-feedback-form]");
+    const teacherFeedbackInput = document.querySelector("[data-teacher-feedback-input]");
+    const teacherFeedbackStatus = document.querySelector("[data-teacher-feedback-status]");
     const previewModal = document.querySelector("[data-preview-modal]");
     const previewContent = document.querySelector("[data-preview-content]");
     const previewClose = document.querySelector("[data-preview-close]");
@@ -35,11 +39,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const accessModal = document.querySelector("[data-access-modal]");
     const accessModalOpen = document.querySelector("[data-access-modal-open]");
     const accessModalClose = document.querySelectorAll("[data-access-modal-close]");
+    const inviteForm = document.querySelector("[data-invite-form]");
+    const inviteStatus = document.querySelector("[data-invite-status]");
+    const selfEnrollForm = document.querySelector("[data-self-enroll-form]");
+    const selfEnrollStatus = document.querySelector("[data-self-enroll-status]");
+    const feedbackVisibilitySelect = document.querySelector("[data-feedback-visibility]");
+    const feedbackReleaseRow = document.querySelector("[data-feedback-release-row]");
+    const feedbackReleaseBtn = document.querySelector("[data-feedback-release]");
+    const feedbackReleaseStatus = document.querySelector("[data-feedback-release-status]");
     const themeToggle = document.querySelector("[data-theme-toggle]");
     const settingsForm = document.querySelector("[data-settings-form]");
     const saveStatus = document.querySelector("[data-save-status]");
     const toast = document.querySelector("[data-save-toast]");
     let activeStudent = null;
+    let activeFeedbackSessionId = null;
     if (attemptSelect) attemptSelect.disabled = true;
 
     const showPane = (target) => {
@@ -466,7 +479,25 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
-    const renderFeedback = () => {};
+    const renderFeedback = (feedback = null, sessionId = null) => {
+        activeFeedbackSessionId = sessionId || null;
+        if (aiFeedbackEl) {
+            aiFeedbackEl.textContent = (feedback && feedback.ai_text)
+                ? feedback.ai_text
+                : "AI feedback will appear once the viva ends.";
+        }
+        if (teacherFeedbackInput) {
+            teacherFeedbackInput.value = feedback?.teacher_text || "";
+            teacherFeedbackInput.disabled = !activeFeedbackSessionId;
+        }
+        if (teacherFeedbackForm) {
+            const saveBtn = teacherFeedbackForm.querySelector("button[type='submit']");
+            if (saveBtn) saveBtn.disabled = !activeFeedbackSessionId;
+        }
+        if (teacherFeedbackStatus) {
+            setStatus(teacherFeedbackStatus, "");
+        }
+    };
 
     const getAttemptTimestamp = (attempt) => {
         if (!attempt) return 0;
@@ -546,7 +577,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!attempts.length) {
             renderMessages([]);
             renderFlags([]);
-            renderFeedback(null);
+            renderFeedback(null, null);
             if (transcriptDuration) transcriptDuration.textContent = "Duration: —";
             if (transcriptStatus) transcriptStatus.textContent = "Pending";
             return;
@@ -559,7 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         renderTranscriptTimeline(attempt.messages || [], attempt.events || []);
         renderFlags(attempt.flags || []);
-        renderFeedback(attempt.feedback);
+        renderFeedback(attempt.feedback, attempt.session_id);
         renderFiles(attempt.files || []);
 
         if (transcriptDuration) {
@@ -644,8 +675,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const term = e.target.value.trim().toLowerCase();
 
             rows().forEach(row => {
+                const search = row.dataset.studentSearch || "";
                 const name = row.querySelector("div")?.textContent?.toLowerCase() || "";
-                row.style.display = term && !name.includes(term) ? "none" : "";
+                const haystack = `${search} ${name}`.trim();
+                row.style.display = term && !haystack.includes(term) ? "none" : "";
             });
 
             opts().forEach(opt => {
@@ -679,6 +712,51 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         return null;
+    };
+
+    const setStatus = (el, msg, tone = "neutral") => {
+        if (!el) return;
+        el.textContent = msg || "";
+        el.dataset.tone = tone;
+        el.classList.toggle("is-hidden", !msg);
+    };
+
+    const attachAjaxForm = (form, statusEl) => {
+        if (!form) return;
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const csrf = form.querySelector("input[name='csrfmiddlewaretoken']")?.value || getCookie("csrftoken");
+            setStatus(statusEl, "Sending...", "neutral");
+            try {
+                const resp = await fetch(form.action, {
+                    method: form.method || "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        ...(csrf ? { "X-CSRFToken": csrf } : {}),
+                    },
+                    body: formData,
+                    redirect: "follow",
+                    credentials: "same-origin",
+                });
+                if (resp.ok) {
+                    setStatus(statusEl, "Saved. Refreshing...", "success");
+                    setTimeout(() => window.location.reload(), 400);
+                } else {
+                    setStatus(statusEl, "Couldn't save right now. Trying again...", "error");
+                    form.submit();
+                }
+            } catch (err) {
+                setStatus(statusEl, "Connection issue. Trying again...", "error");
+                form.submit();
+            }
+        });
+    };
+
+    const updateFeedbackReleaseRow = () => {
+        if (!feedbackReleaseRow || !feedbackVisibilitySelect) return;
+        const show = feedbackVisibilitySelect.value === "after_review";
+        feedbackReleaseRow.classList.toggle("is-hidden", !show);
     };
 
     if (settingsForm) {
@@ -875,13 +953,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (accessModal && accessModalOpen) {
+        let lastFocused = null;
+        const getFocusable = () => Array.from(accessModal.querySelectorAll(
+            "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        ));
+
+        const trapFocus = (e) => {
+            if (e.key !== "Tab") return;
+            const focusable = getFocusable();
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+
         const openAccessModal = (e) => {
             e?.preventDefault();
+            lastFocused = document.activeElement;
             accessModal.classList.add("open");
+            document.addEventListener("keydown", trapFocus);
+            const emailField = accessModal.querySelector("#invite-email");
+            (emailField || getFocusable()[0] || accessModal).focus();
         };
         const closeAccessModal = (e) => {
             e?.preventDefault();
             accessModal.classList.remove("open");
+            document.removeEventListener("keydown", trapFocus);
+            if (lastFocused && typeof lastFocused.focus === "function") {
+                lastFocused.focus();
+            }
         };
         accessModalOpen.addEventListener("click", openAccessModal);
         accessModalClose.forEach(btn => btn.addEventListener("click", closeAccessModal));
@@ -893,6 +999,73 @@ document.addEventListener("DOMContentLoaded", () => {
                 closeAccessModal(e);
             }
         });
+    }
+
+    attachAjaxForm(inviteForm, inviteStatus);
+    attachAjaxForm(selfEnrollForm, selfEnrollStatus);
+
+    if (teacherFeedbackForm && teacherFeedbackInput) {
+        teacherFeedbackForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!activeFeedbackSessionId) {
+                setStatus(teacherFeedbackStatus, "Select a completed attempt first.", "error");
+                return;
+            }
+            const csrf = getCookie("csrftoken");
+            setStatus(teacherFeedbackStatus, "Saving...", "neutral");
+            try {
+                const res = await fetch(`/viva/feedback/${activeFeedbackSessionId}/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrf ? { "X-CSRFToken": csrf } : {}),
+                    },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                        teacher_feedback: teacherFeedbackInput.value || "",
+                    }),
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || "Save failed");
+                }
+                setStatus(teacherFeedbackStatus, "Saved", "success");
+            } catch (err) {
+                setStatus(teacherFeedbackStatus, "Unable to save right now.", "error");
+            }
+        });
+    }
+
+    if (feedbackReleaseBtn) {
+        feedbackReleaseBtn.addEventListener("click", async () => {
+            const csrf = getCookie("csrftoken");
+            setStatus(feedbackReleaseStatus, "Releasing...", "neutral");
+            try {
+                const res = await fetch("/assignment/feedback/release/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrf ? { "X-CSRFToken": csrf } : {}),
+                    },
+                    credentials: "same-origin",
+                    body: JSON.stringify({}),
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || "Release failed");
+                }
+                const data = await res.json().catch(() => ({}));
+                setStatus(feedbackReleaseStatus, data.released_at ? `Released on ${data.released_at}` : "Released", "success");
+                feedbackReleaseBtn.disabled = true;
+            } catch (err) {
+                setStatus(feedbackReleaseStatus, "Unable to release right now.", "error");
+            }
+        });
+    }
+
+    if (feedbackVisibilitySelect) {
+        feedbackVisibilitySelect.addEventListener("change", updateFeedbackReleaseRow);
+        updateFeedbackReleaseRow();
     }
 
     populateSelect();

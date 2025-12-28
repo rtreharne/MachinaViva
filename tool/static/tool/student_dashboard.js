@@ -70,13 +70,15 @@ document.addEventListener("DOMContentLoaded", () => {
     let attemptsUsed = parseInt(pageEl?.dataset.attemptsUsed || "", 10);
     attemptsUsed = Number.isFinite(attemptsUsed) ? attemptsUsed : 0;
     const feedbackVisibility = pageEl?.dataset.feedbackVisibility || "immediate";
-    const feedbackPlaceholder = "Thanks for finishing the viva. Placeholder feedback: Solid structure, tighten evidence in section 2, and clarify limitations in your conclusion.";
+    const feedbackReleased = pageEl?.dataset.feedbackReleased === "true";
     const historiesScript = document.getElementById("session-histories-data");
     const sessionHistories = historiesScript ? JSON.parse(historiesScript.textContent || "{}") : {};
     const filesScript = document.getElementById("session-files-data");
     const sessionFiles = filesScript ? JSON.parse(filesScript.textContent || "{}") : {};
     const sessionMetaScript = document.getElementById("session-meta-data");
     const sessionMeta = sessionMetaScript ? JSON.parse(sessionMetaScript.textContent || "{}") : {};
+    const feedbackScript = document.getElementById("session-feedback-data");
+    const sessionFeedback = feedbackScript ? JSON.parse(feedbackScript.textContent || "{}") : {};
     const instructorToggleEnabled = pageEl?.dataset.instructorToggleEnabled === "true";
     const allowEarlySubmit = pageEl?.dataset.allowEarlySubmit === "true";
     const eventTracking = pageEl?.dataset.eventTracking === "true";
@@ -97,6 +99,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const backToVivaBtns = document.querySelectorAll("[data-back-to-viva]");
     const attemptsMeta = document.querySelector("[data-attempts-meta]");
     const vivaChatWindow = document.querySelector("[data-viva-chat-window]");
+    const aiFeedbackEl = document.querySelector("[data-ai-feedback]");
+    const teacherFeedbackEl = document.querySelector("[data-teacher-feedback]");
+    const aiFeedbackDefault = aiFeedbackEl?.textContent || "";
+    const teacherFeedbackDefault = teacherFeedbackEl?.textContent || "";
+    const vivaHistoryLayout = document.querySelector("[data-viva-history-layout]");
+    const vivaFeedbackPanel = document.querySelector("[data-viva-feedback-panel]");
     const vivaInput = document.querySelector("[data-viva-input]");
     const vivaSend = document.querySelector("[data-viva-send]");
     const uploadForms = document.querySelectorAll("[data-reupload-form],[data-upload-form]");
@@ -144,6 +152,35 @@ document.addEventListener("DOMContentLoaded", () => {
             uploadHint.textContent = "";
             uploadHint.classList.add("is-hidden");
         }
+    };
+
+    const isAiFeedbackVisible = () => (
+        feedbackVisibility === "immediate"
+        || (feedbackVisibility === "after_review" && feedbackReleased)
+    );
+
+    const setHistoryFeedbackVisible = (visible) => {
+        if (vivaHistoryLayout) {
+            vivaHistoryLayout.classList.toggle("show-feedback", visible);
+        }
+        if (vivaFeedbackPanel) {
+            vivaFeedbackPanel.classList.toggle("is-hidden", !visible);
+        }
+    };
+
+    const updateFeedbackPanel = (aiText, teacherText) => {
+        if (aiFeedbackEl) {
+            aiFeedbackEl.textContent = aiText || aiFeedbackDefault;
+        }
+        if (teacherFeedbackEl) {
+            teacherFeedbackEl.textContent = teacherText || teacherFeedbackDefault;
+        }
+    };
+
+    const applySessionFeedback = (sessionId) => {
+        if (!sessionId) return;
+        const fb = sessionFeedback[String(sessionId)] || {};
+        updateFeedbackPanel(fb.ai_text || "", fb.teacher_text || "");
     };
     const syncInstructorIncludes = () => {
         const rows = document.querySelectorAll("[data-instructor-resource]");
@@ -819,18 +856,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    const endSession = async (finalText = "", feedbackText = null) => {
+    const endSession = async (finalText = "") => {
         await ensureSession(startUrlDefault);
         const duration = Math.max(0, vivaTotalSeconds - vivaTimeRemaining);
         const closingSessionId = vivaSessionId || lastSessionId;
         if (!closingSessionId) return;
-        sendToServer({
+        const response = await sendToServer({
             session_id: closingSessionId,
             sender: "student",
             text: finalText || undefined,
             ended: true,
             duration_seconds: duration,
-            feedback_text: feedbackText || undefined,
         });
         clearInterval(vivaTimerInterval);
         vivaTimerInterval = null;
@@ -847,7 +883,11 @@ document.addEventListener("DOMContentLoaded", () => {
             // Completed a run; allow another attempt
             updateVivaControls();
         }
-        return closingSessionId;
+        return {
+            sessionId: closingSessionId,
+            feedbackText: response?.feedback_text || "",
+            feedbackVisible: !!response?.feedback_visible,
+        };
     };
 
     const requestAiReply = async (sessionId, text) => {
@@ -878,20 +918,32 @@ document.addEventListener("DOMContentLoaded", () => {
             if (text) {
                 addVivaBubble("user", text);
             }
-            const feedbackText = feedbackVisibility === "immediate" ? feedbackPlaceholder : null;
-            const sessionId = await endSession(text, feedbackText);
+            const historySnapshot = captureChatHistory();
+            const expectAiFeedback = isAiFeedbackVisible();
+            let thinking = null;
+            if (expectAiFeedback) {
+                clearVivaChat();
+                thinking = showVivaThinking();
+            }
+            const result = await endSession(text);
+            const sessionId = result?.sessionId;
+            const aiText = result?.feedbackText || "";
+            const aiVisible = !!result?.feedbackVisible;
             if (sessionId) {
-                const historySnapshot = captureChatHistory();
-                if (feedbackVisibility === "immediate") {
-                    historySnapshot.push({ sender: "ai", text: feedbackPlaceholder });
-                }
                 sessionHistories[String(sessionId)] = historySnapshot;
+                if (aiVisible && aiText) {
+                    sessionFeedback[String(sessionId)] = {
+                        ai_text: aiText,
+                        teacher_text: sessionFeedback[String(sessionId)]?.teacher_text || "",
+                    };
+                }
                 const selectedFiles = buildSelectedFiles();
                 const selectedInstructorFiles = buildSelectedInstructorFiles();
                 sessionFiles[String(sessionId)] = selectedInstructorFiles.length
                     ? selectedFiles.concat(selectedInstructorFiles)
                     : selectedFiles;
                 appendAttemptRow(String(sessionId));
+                applySessionFeedback(String(sessionId));
             }
             vivaInput.value = "";
             vivaSend.textContent = "Submitted";
@@ -899,14 +951,22 @@ document.addEventListener("DOMContentLoaded", () => {
             vivaSend.classList.remove("submit-mode");
             vivaSessionActive = false;
             setVivaInputDisabled(true);
-            if (feedbackVisibility === "immediate") {
-                clearVivaChat();
-                const thinking = showVivaThinking();
+            if (expectAiFeedback) {
                 setTimeout(() => {
                     thinking?.remove();
-                    addVivaBubble("ai", feedbackPlaceholder);
-                    addRatingBar();
-                }, 900);
+                    if (aiVisible && aiText) {
+                        addVivaBubble("ai", aiText);
+                        updateFeedbackPanel(aiText, "");
+                        addRatingBar();
+                    } else {
+                        showSummary();
+                    }
+                }, 400);
+            } else if (aiVisible && aiText) {
+                clearVivaChat();
+                addVivaBubble("ai", aiText);
+                updateFeedbackPanel(aiText, "");
+                addRatingBar();
             } else {
                 showSummary();
             }
@@ -988,8 +1048,10 @@ document.addEventListener("DOMContentLoaded", () => {
         activeHistorySessionId = sessionId;
         showModelAnswers = false;
         if (chatCard) chatCard.classList.add("is-history");
+        setHistoryFeedbackVisible(true);
         updateModelToggle(sessionId);
         renderHistory(sessionId);
+        applySessionFeedback(sessionId);
         renderSessionFiles(sessionId);
         vivaInputRow?.classList.add("is-hidden");
         setVivaInputDisabled(true);
@@ -1018,6 +1080,8 @@ document.addEventListener("DOMContentLoaded", () => {
         viewingHistory = false;
         vivaSessionActive = true;
         chatCard?.classList.remove("is-history");
+        setHistoryFeedbackVisible(false);
+        applySessionFeedback(activeId);
         clearVivaChat();
         if (history.length === 0) {
             vivaIntroStarted = false;
@@ -1140,6 +1204,7 @@ document.addEventListener("DOMContentLoaded", () => {
         activeHistorySessionId = null;
         showModelAnswers = false;
         chatCard.classList.remove("is-history");
+        setHistoryFeedbackVisible(false);
         if (modelToggleBtn) {
             modelToggleBtn.classList.add("is-hidden");
             modelToggleBtn.textContent = "Show model answers";

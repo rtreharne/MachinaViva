@@ -29,6 +29,13 @@
                 <label for="email">Student email</label>
                 <input id="email" name="email" type="email" required placeholder="student@example.edu">
             </div>
+            <div class="settings-row">
+                <label for="role">Role</label>
+                <select id="role" name="role">
+                    <option value="student" selected>Student</option>
+                    <option value="instructor">Instructor</option>
+                </select>
+            </div>
             <div class="settings-actions">
                 <button type="submit" class="view-btn">Send invite</button>
             </div>
@@ -42,14 +49,15 @@
 
         {% if invites %}
             <div class="table-card">
-                <div class="table-head cols-4">
+                <div class="table-head cols-5">
                     <div>Email</div>
                     <div>Status</div>
+                    <div>Role</div>
                     <div>Expires</div>
                     <div>Actions</div>
                 </div>
                 {% for invite in invites %}
-                    <div class="table-row cols-4">
+                    <div class="table-row cols-5">
                         <div class="monospace">{{ invite.email }}</div>
                         <div>
                             {% if invite.accepted_at %}
@@ -61,6 +69,7 @@
                                 <span class="pill neutral">Pending</span>
                             {% endif %}
                         </div>
+                        <div class="meta">{{ invite.role|capfirst }}</div>
                         <div class="meta">{{ invite.expires_at }}</div>
                         <div class="inline-actions">
                             {% if not invite.accepted_at %}

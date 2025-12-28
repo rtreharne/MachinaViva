@@ -44,6 +44,7 @@
      data-attempts-left="{{ attempts_left|default:0 }}"
      data-attempts-used="{{ attempts_used|default:0 }}"
      data-feedback-visibility="{{ assignment.feedback_visibility|default:'immediate' }}"
+     data-feedback-released="{% if feedback_released %}true{% else %}false{% endif %}"
      data-unlimited-attempts="{% if assignment.max_attempts and assignment.max_attempts > 0 %}false{% else %}true{% endif %}"
      data-config-files-included="{% if config_files_included %}true{% else %}false{% endif %}"
      data-event-tracking="{% if assignment.event_tracking %}true{% else %}false{% endif %}"
@@ -260,14 +261,6 @@
                     </div>
                 {% endif %}
 
-                {% if feedback %}
-                    <div class="settings-row">
-                        <label>Feedback</label>
-                        <div class="meta"><strong>Strengths:</strong> {{ feedback.strengths }}</div>
-                        <div class="meta"><strong>Improvements:</strong> {{ feedback.improvements }}</div>
-                        <div class="meta"><strong>Impression:</strong> {{ feedback.impression }}</div>
-                    </div>
-                {% endif %}
             </div>
 
             <div class="settings-form-card is-hidden" data-viva-chat-card>
@@ -280,10 +273,36 @@
                     </div>
                 </div>
                 <div class="viva-chat-card">
-                    <div class="viva-chat-wrap">
-                        <div class="panel-chat viva-chat-window"
-                             data-viva-chat-window
-                             data-initial-ai="... Before we begin: answer in your own words, keep replies concise, stay focused on your submission. The viva will start as soon as you respond to this message."></div>
+                    <div class="viva-history-layout" data-viva-history-layout>
+                        <div class="viva-chat-wrap">
+                            <div class="panel-chat viva-chat-window"
+                                 data-viva-chat-window
+                                 data-initial-ai="... Before we begin: answer in your own words, keep replies concise, stay focused on your submission. The viva will start as soon as you respond to this message."></div>
+                        </div>
+                        <aside class="viva-history-side is-hidden" data-viva-feedback-panel>
+                            <div class="side-card">
+                                <p class="tiny">AI feedback</p>
+                                <div class="feedback-block" data-ai-feedback>
+                                    {% if ai_feedback %}
+                                        {{ ai_feedback }}
+                                    {% elif ai_feedback_message %}
+                                        {{ ai_feedback_message }}
+                                    {% else %}
+                                        Select an attempt to view AI feedback.
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="side-card">
+                                <p class="tiny">Teacher feedback</p>
+                                <div class="feedback-block" data-teacher-feedback>
+                                    {% if teacher_feedback %}
+                                        {{ teacher_feedback }}
+                                    {% else %}
+                                        Select an attempt to view teacher feedback.
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </aside>
                     </div>
                     <div class="input-row viva-input">
                         <div class="input-shell">
@@ -354,6 +373,7 @@
 {{ session_histories|json_script:"session-histories-data" }}
 {{ session_files|json_script:"session-files-data" }}
 {{ session_meta|json_script:"session-meta-data" }}
+{{ session_feedback|json_script:"session-feedback-data" }}
 {{ config_files|json_script:"config-files-data" }}
 </body>
 </html>

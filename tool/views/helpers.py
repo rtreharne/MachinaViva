@@ -113,12 +113,12 @@ def user_role_labels(user):
     return ["Learner"]
 
 
-def set_standalone_session(request, user, assignment, force_instructor=False):
+def set_standalone_session(request, user, assignment, force_instructor=False, roles_override=None):
     """
     Populate session keys expected by existing LTI views so standalone flows
     can reuse the same assignment/submission/viva handlers.
     """
-    roles = user_role_labels(user)
+    roles = roles_override or user_role_labels(user)
     if force_instructor and "Instructor" not in roles:
         roles = ["Instructor"]
 

@@ -27,8 +27,7 @@
             <a href="#flow">Flow</a>
             <a href="#dashboard">Teacher</a>
             <a href="#pillars">Why</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#" class="pill book-walkthrough">Book Walkthrough</a>
+            <a href="/app/login" class="pill">Login</a>
         </nav>
     </header>
 
@@ -39,14 +38,14 @@
 
         <div class="hero-grid">
             <div class="hero-copy">
-                <p class="eyebrow">Authentic vivas for the AI era in Higher Education</p>
-                <h1>Assess real understanding with a live, text-based viva.</h1>
+                <p class="eyebrow">Authentic viva checks for the AI age</p>
+                <h1>Verify understanding behind every submission.</h1>
                 <p class="lede">
-                    Inclusive, consistent vivas that keep assessment authentic in the generative-AI era. Guided questioning, trusted transcripts, no hard surveillance, and a seamless fit with university workflows.
+                    Pair coursework with a fast text viva. Students answer guided follow up questions to their written submissions, and teachers get transcripts, feedback, and integrity signals that make ownership clear without invigilated exams or surveillance. Works in your LMS (LTI 1.3) or in our standalone portal.
                 </p>
                 <div class="hero-actions">
-                    <a class="cta primary book-walkthrough" href="#">Book Walkthrough</a>
-                    <a class="cta ghost light" href="#flow">View flow</a>
+                    <a class="cta primary" href="/app/login">Launch app</a>
+                    <a class="cta ghost light" href="#flow">See how it works</a>
                 </div>
             </div>
 
@@ -100,13 +99,13 @@
     <section id="challenge" class="section spotlight">
         <div class="section-head">
             <p class="eyebrow">The challenge</p>
-            <h2>Students still need to show they understand, even with AI in the mix.</h2>
-            <p class="lede">Generative AI can churn out essays and code, but it can’t think on its feet. Universities need a fast, fair viva to prove students still own their ideas.</p>
+            <h2>GenAI can write the work — it can’t defend it.</h2>
+            <p class="lede">Use a viva to surface real reasoning, prove ownership, and keep grading fair without policing screens or banning tools.</p>
         </div>
         <div class="pillar-grid challenge-grid">
             <div class="pillar-card">
                 <h3>The risk</h3>
-                <p>AI can polish or even write submissions, making it hard to tell who understands the work. A grade based on text alone can reward the tool, not the student.</p>
+                <p>AI can polish or even write submissions, making it hard to tell who understands the work. Grades based on text alone can reward the tool, not the student.</p>
                 <p class="muted">Consequence: silent erosion of learning outcomes and grade integrity.</p>
             </div>
             <div class="pillar-card">
@@ -116,7 +115,7 @@
             </div>
             <div class="pillar-card">
                 <h3>The answer</h3>
-                <p>Scaled vivas: guided, text-based dialogue that confirms comprehension and deters delegation to AI. Signals and transcripts keep outcomes, context, and integrity visible.</p>
+                <p>Scaled vivas: guided, text-based dialogue that confirms comprehension and deters delegation to AI. Signals and transcripts make authentic work visible.</p>
                 <p class="muted">Result: authentic assessment at cohort scale without surveillance or scheduling chaos.</p>
             </div>
         </div>
@@ -126,8 +125,8 @@
     <section id="flow" class="section">
         <div class="section-head">
             <p class="eyebrow">Flow</p>
-            <h2>From zero to viva in minutes.</h2>
-            <p class="lede">Clear steps for students, low lift for teachers.</p>
+            <h2>From zero to viva in minutes, LTI or standalone.</h2>
+            <p class="lede">Clear steps for students, low lift for teachers, whichever launch path you choose.</p>
         </div>
         <div class="flow-streams">
             <div class="flow-stream">
@@ -136,7 +135,7 @@
                     <article class="flow-card">
                         <span class="step">01</span>
                         <h3>Makes a submission</h3>
-                        <p>Submits to the viva assessment link in the VLE, like any other assignment.</p>
+                        <p>Joins from the LMS assignment link (LTI) or follows an email invite (standalone).</p>
                     </article>
                     <article class="flow-card">
                         <span class="step">02</span>
@@ -156,7 +155,7 @@
                     <article class="flow-card">
                         <span class="step">01</span>
                         <h3>Configure viva</h3>
-                        <p>Creates and configures viva assignment directly in VLE.</p>
+                        <p>Create inside your LMS (LTI 1.3) or in the standalone dashboard with the same settings.</p>
                     </article>
                     <article class="flow-card">
                         <span class="step">02</span>
@@ -181,7 +180,7 @@
             <p class="lede">See completions, transcripts, integrity flags, or flip to settings to configure vivas.</p>
         </div>
         <div class="view-toggle">
-            <button class="view-btn active" data-view-switch="dashboard">Dashboard</button>
+            <button class="view-btn active" data-view-switch="dashboard">Roster</button>
             <button class="view-btn" data-view-switch="settings">Viva settings</button>
         </div>
 
@@ -287,81 +286,195 @@
         </div>
 
         <div class="dash-view" data-view-pane="settings">
-            <div class="settings-form-card">
-                <div class="settings-row">
-                    <label>Viva Title</label>
-                    <input type="text" value="Climate resilience viva">
-                </div>
-                <div class="settings-row split">
-                    <div>
-                        <label>Duration</label>
-                        <input type="number" min="1" step="1" value="10" aria-label="Duration in minutes"> minutes
+            <div class="settings-grid max-two">
+                <div class="settings-form-card">
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Overview</h3>
                     </div>
-                    <div>
-                        <label>Multiple attempts</label>
-                        <input type="number" min="1" max="5" step="1" value="1" aria-label="Multiple attempts">
-                    </div>
-                    <div>
-                        <label>Tone</label>
-                        <select>
-                            <option selected>Supportive</option>
-                            <option>Neutral</option>
-                            <option>Probing</option>
-                            <option>Peer-like</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Feedback visibility</label>
-                        <select>
-                            <option selected>Show immediately</option>
-                            <option>After teacher review</option>
-                            <option>Hide</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="settings-row split">
-                    <div>
-                        <label>Resources</label>
-                        <div class="resource-table">
-                            <div class="resource-head">
-                                <span>File</span>
-                                <span>Feed to Viva</span>
-                                <span></span>
-                            </div>
-                            <div class="resource-row">
-                                <span>Assignment_brief.pdf</span>
+                    <div class="settings-row split">
+                        <div>
+                            <label>Viva title</label>
+                            <input type="text" value="Climate resilience viva">
+                        </div>
+                        <div>
+                            <label>Duration (minutes)</label>
+                            <input type="number" min="1" step="1" value="10" aria-label="Duration in minutes">
+                        </div>
+                        <div>
+                            <label>Attempts</label>
+                            <input type="number" min="1" max="5" step="1" value="2" aria-label="Attempts">
+                            <div class="unlimited-toggle">
+                                <span class="meta">Unlimited</span>
                                 <label class="switch">
-                                    <input type="checkbox" checked>
+                                    <input type="checkbox">
                                     <span class="slider"></span>
                                 </label>
-                                <button class="pill no">Delete</button>
-                            </div>
-                            <div class="resource-row">
-                                <span>Reading_list.docx</span>
-                                <label class="switch">
-                                    <input type="checkbox" checked>
-                                    <span class="slider"></span>
-                                </label>
-                                <button class="pill no">Delete</button>
                             </div>
                         </div>
-                        <div class="upload-hint">Upload additional resources for this viva.</div>
-                        <input type="file" aria-label="Upload assignment resource">
+                    </div>
+                    <div class="settings-row split">
+                        <div>
+                            <label>Tone</label>
+                            <select>
+                                <option selected>Supportive</option>
+                                <option>Neutral</option>
+                                <option>Probing</option>
+                                <option>Peer-like</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Feedback visibility</label>
+                            <select>
+                                <option selected>Show immediately</option>
+                                <option>After teacher review</option>
+                                <option>Hide</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label>Student permissions</label>
+                        <div class="tracking-table">
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Download feedback/transcript</div>
+                                    <div class="meta">Allow students to export their session.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Allow early submission</div>
+                                    <div class="meta">Students can finish before the timer ends.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Enable model answers</div>
+                                    <div class="meta">Show exemplar answers after completion.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Allow students to toggle instructor files</div>
+                                    <div class="meta">Students must include at least one file.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label>Tracking</label>
+                        <div class="tracking-table">
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Event tracking</div>
+                                    <div class="meta">Paste, blur/focus, window changes.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="tracking-item">
+                                <div>
+                                    <div class="tracking-label">Arrhythmic typing</div>
+                                    <div class="meta">Flag irregular bursts.</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="settings-row">
-                    <label>Additional prompts</label>
-                    <textarea rows="3" placeholder="Add bespoke prompts or instructions for this viva"></textarea>
+
+                <div class="settings-form-card">
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Tone & guidance</h3>
+                    </div>
+                    <div class="settings-row">
+                        <label>Core viva instructions</label>
+                        <textarea rows="4" placeholder="How should the AI conduct the viva? Tone, strictness, what to probe, what to avoid.">Ask for evidence and counterpoints. Stay supportive but probe reasoning depth.</textarea>
+                    </div>
+                    <div class="settings-row">
+                        <label>Additional prompts</label>
+                        <textarea rows="3" placeholder="Any bespoke prompts or discipline-specific instructions.">Ask how the student would adapt their claim in a different policy context.</textarea>
+                    </div>
+                    <div class="settings-row">
+                        <label>Instructor notes (private)</label>
+                        <textarea rows="3" placeholder="Private notes about this viva.">Check their citation of the 2023 DEFRA report.</textarea>
+                    </div>
                 </div>
-                <div class="settings-row">
-                    <label>Allow student to download report</label>
-                    <label class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="settings-actions">
-                    <button class="control-btn">Save settings</button>
+
+                <div class="settings-form-card">
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Viva files</h3>
+                    </div>
+                    <div class="settings-row">
+                        <label>Files</label>
+                        <div class="submission-table-wrap">
+                            <div class="submission-table-header">
+                                <span>File</span>
+                                <span>Include</span>
+                                <span>Actions</span>
+                            </div>
+                            <div class="submission-table-body">
+                                <div class="submission-row">
+                                    <div class="submission-cell file-name">
+                                        Assignment_brief.pdf
+                                        <div class="meta"><a class="link file-preview" href="#">Preview text</a></div>
+                                    </div>
+                                    <div class="submission-cell">
+                                        <label class="switch" aria-label="Include in viva">
+                                            <input type="checkbox" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="submission-cell submission-actions">
+                                        <button class="icon-btn danger" type="button">Delete</button>
+                                    </div>
+                                </div>
+                                <div class="submission-row row-alt">
+                                    <div class="submission-cell file-name">
+                                        Reading_list.docx
+                                        <div class="meta"><a class="link file-preview" href="#">Preview text</a></div>
+                                    </div>
+                                    <div class="submission-cell">
+                                        <label class="switch" aria-label="Include in viva">
+                                            <input type="checkbox" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="submission-cell submission-actions">
+                                        <button class="icon-btn danger" type="button">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label>Upload files</label>
+                        <div class="submission-form upload-inline">
+                            <input type="file" accept=".pdf,.docx,.txt">
+                            <button type="button" class="control-btn">Upload</button>
+                        </div>
+                        <div class="meta upload-hint">PDF, DOCX, TXT supported.</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -385,7 +498,7 @@
             </div>
             <div class="pillar-card">
                 <h3>Institution-ready</h3>
-                <p>LTI 1.3 native, runs inside your LMS, no parallel logins or extra identities.</p>
+                <p>LTI-first for enterprise LMS plus a full standalone portal — same experience, your choice of launch.</p>
             </div>
             <div class="pillar-card">
                 <h3>Scales with cohorts</h3>
@@ -398,8 +511,8 @@
         </div>
         <div class="trust-grid">
             <div class="trust-card">
-                <h3>LTI 1.3 native</h3>
-                <p>Works with Canvas, Blackboard Ultra, Moodle, Brightspace, and Sakai. No bespoke SSO.</p>
+                <h3>LTI + standalone ready</h3>
+                <p>Use your LMS (LTI 1.3) or our hosted portal. Roles and guardrails enforced either way.</p>
             </div>
             <div class="trust-card">
                 <h3>Data minimisation</h3>
@@ -417,6 +530,7 @@
     </section>
 
     <!-- PRICING -->
+    <!--
     <section id="pricing" class="section">
         <div class="section-head">
             <p class="eyebrow">Pricing</p>
@@ -426,51 +540,51 @@
         <div class="pricing-grid">
             <article class="price-card">
                 <div class="price-top">
-                    <p class="tiny">Pilot</p>
+                    <p class="tiny">Standalone starter</p>
                     <h3>Free</h3>
-                    <p class="price-sub">Up to 50 students · 1 course · 1 year</p>
+                    <p class="price-sub">First assignment · up to 20 students</p>
                 </div>
                 <ul class="price-points">
-                    <li>Full viva experience</li>
-                    <li>Trusted transcripts & signals</li>
-                    <li>Email support</li>
-                </ul>
-                <button class="cta ghost light book-walkthrough">Book a walkthrough</button>
-            </article>
-            <article class="price-card">
-                <div class="price-top">
-                    <p class="tiny">Course*</p>
-                    <h3>£5</h3>
-                    <p class="price-sub">per student per year</p>
-                </div>
-                <ul class="price-points">
-                    <li>Single course rollout</li>
-                    <li>Configured feedback & tone</li>
-                    <li>Priority support</li>
+                    <li>Single instructor account</li>
+                    <li>Email invites and roster</li>
+                    <li>Transcripts, feedback, integrity signals</li>
                 </ul>
                 <button class="cta ghost light book-walkthrough">Book a walkthrough</button>
             </article>
             <article class="price-card highlight">
                 <div class="price-top">
-                    <p class="tiny">School</p>
-                    <h3>£4k</h3>
-                    <p class="price-sub">per year · up to 2000 students</p>
+                    <p class="tiny">Standalone pay-as-you-viva</p>
+                    <h3>£3</h3>
+                    <p class="price-sub">per assignment per student (after starter)</p>
                 </div>
                 <ul class="price-points">
-                    <li>Multiple courses & cohorts</li>
-                    <li>Shared rubrics & settings</li>
-                    <li>Dedicated success partner</li>
+                    <li>One instructor account per tenant</li>
+                    <li>Unlimited assignments and invites</li>
+                    <li>Monthly billing on assignments launched</li>
                 </ul>
                 <button class="cta primary book-walkthrough">Book a walkthrough</button>
             </article>
             <article class="price-card">
                 <div class="price-top">
-                    <p class="tiny">Institution*</p>
-                    <h3>£20k</h3>
+                    <p class="tiny">LTI course</p>
+                    <h3>£5</h3>
+                    <p class="price-sub">per student per year</p>
+                </div>
+                <ul class="price-points">
+                    <li>Launch from your LMS (LTI 1.3)</li>
+                    <li>Roster/roles, deep links, grade return</li>
+                    <li>Priority support</li>
+                </ul>
+                <button class="cta ghost light book-walkthrough">Book a walkthrough</button>
+            </article>
+            <article class="price-card">
+                <div class="price-top">
+                    <p class="tiny">LTI institution</p>
+                    <h3>From £20k</h3>
                     <p class="price-sub">per year</p>
                 </div>
                 <ul class="price-points">
-                    <li>University-wide deployment</li>
+                    <li>University-wide LTI deployment</li>
                     <li>Advanced integrity insights</li>
                     <li>Data residency choices</li>
                 </ul>
@@ -478,11 +592,13 @@
             </article>
         </div>
         <br>
-        <p class="price-footnote">*Course plan capped at 500 students per year. Institution plan capped at 10,000 students; custom terms available for larger deployments.</p>
+        <p class="price-footnote">Standalone pricing: first assignment free for up to 20 students; then £3 per assignment per student (multiple viva attempts per assignment are included). Example: 100 students doing one assignment = 20 free + 80 × £3 = £240; a second assignment for the same 100 students = 100 × £3 = £300. One instructor account per standalone tenant. LTI course capped at 500 students per year. LTI institution includes up to 10,000 students; custom terms available for larger deployments.</p>
 
     </section>
+    -->
 
     <!-- PILOTS -->
+    <!--
     <section id="pilots" class="section spotlight">
         <div class="section-head">
             <p class="eyebrow">Pilots underway</p>
@@ -498,17 +614,10 @@
                 <div class="logo-card"><img src="{% static 'tool/img/Southampton.png' %}" alt="Southampton University logo" class="logo-img"></div>
                 <div class="logo-card"><img src="{% static 'tool/img/Swansea.png' %}" alt="Swansea University logo" class="logo-img"></div>
                 <div class="logo-card"><img src="{% static 'tool/img/LJMU.png' %}" alt="Liverpool John Moores University logo" class="logo-img"></div>
-                <!-- repeat for seamless scroll -->
-                <div class="logo-card"><img src="{% static 'tool/img/Manchester.png' %}" alt="University of Manchester logo" class="logo-img"></div>
-                <div class="logo-card"><img src="{% static 'tool/img/Durham.png' %}" alt="Durham University logo" class="logo-img"></div>
-                <div class="logo-card"><img src="{% static 'tool/img/Warwick.png' %}" alt="Warwick University logo" class="logo-img"></div>
-                <div class="logo-card"><img src="{% static 'tool/img/Loughborough.png' %}" alt="Loughborough University logo" class="logo-img"></div>
-                <div class="logo-card"><img src="{% static 'tool/img/Southampton.png' %}" alt="Southampton University logo" class="logo-img"></div>
-                <div class="logo-card"><img src="{% static 'tool/img/Swansea.png' %}" alt="Swansea University logo" class="logo-img"></div>
-                <div class="logo-card"><img src="{% static 'tool/img/LJMU.png' %}" alt="Liverpool John Moores University logo" class="logo-img"></div>
             </div>
         </div>
     </section>
+    -->
 
     <div class="modal-overlay" data-booking-modal>
         <div class="modal">
@@ -591,21 +700,6 @@
             <div class="modal-success" data-booking-success hidden>
                 <p>Thanks! Your walkthrough request was received. We’ll reach out shortly with a Teams invite.</p>
                 <button class="cta primary" data-booking-close>Close</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay holiday" data-holiday-modal>
-        <div class="modal">
-            <div class="modal-head">
-                <h3>🎄 Walkthrough queue update 🎁</h3>
-                <button class="modal-close" data-holiday-close aria-label="Close holiday notice">×</button>
-            </div>
-            <p class="modal-sub">Wow! Demand has been wild — we don't have any more walkthrough slots available until January 2026.</p>
-            <p class="modal-sub">In the meantime we wish you a very Merry Christmas and a Happy New Year filled with authentic vivas. 🎅✨</p><br>
-            <div class="form-actions">
-                <button class="cta primary book-walkthrough" data-holiday-close>Book Walkthrough</button>
-                <button class="cta ghost" data-holiday-close>Got it</button>
             </div>
         </div>
     </div>
