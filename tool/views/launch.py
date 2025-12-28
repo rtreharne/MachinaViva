@@ -1,6 +1,7 @@
 import json
 import secrets
 import jwt
+import os
 from urllib.parse import urlencode
 
 from django.shortcuts import render, redirect
@@ -11,6 +12,8 @@ from jwt import PyJWKClient
 from jwcrypto import jwk
 from datetime import datetime
 from tool.models import ToolConfig
+
+LTI_PUBLIC_KEY_PATH = os.getenv("LTI_PUBLIC_KEY_PATH", "lti_keys/public.pem")
 
 
 # ----------------------------------------------------------
@@ -217,7 +220,7 @@ def jwks(request):
     print("🔥 JWKS endpoint hit from:", request.META.get("HTTP_USER_AGENT"))
 
     # Load your RSA public key
-    with open("lti_keys/public.pem", "rb") as f:
+    with open(LTI_PUBLIC_KEY_PATH, "rb") as f:
         pub = jwk.JWK.from_pem(f.read())
 
     # Export raw JWK from the PEM

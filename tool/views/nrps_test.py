@@ -2,9 +2,11 @@ import time
 import json
 import jwt
 import requests
+import os
 from django.http import JsonResponse, HttpResponseBadRequest
 from tool.models import ToolConfig
 
+LTI_PRIVATE_KEY_PATH = os.getenv("LTI_PRIVATE_KEY_PATH", "lti_keys/private.pem")
 
 def nrps_test(request):
     """Diagnostic endpoint: Try fetching the roster via NRPS."""
@@ -27,7 +29,7 @@ def nrps_test(request):
     # ---------------------------------------------------
     # Step 1: Create client_assertion for Canvas
     # ---------------------------------------------------
-    private_key = open("lti_keys/private.pem", "rb").read()
+    private_key = open(LTI_PRIVATE_KEY_PATH, "rb").read()
 
     client_assertion_payload = {
         "iss": platform.client_id,

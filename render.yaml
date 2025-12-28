@@ -1,0 +1,71 @@
+databases:
+  - name: vivanoodle-db
+    plan: starter
+    databaseName: vivanoodle
+    user: vivanoodle
+
+services:
+  - type: web
+    name: vivanoodle
+    env: python
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    releaseCommand: "python manage.py migrate --noinput"
+    startCommand: "gunicorn lti.wsgi:application"
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
+      - key: MEDIA_ROOT
+        value: "/var/data/media"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vivanoodle-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EMAIL_BACKEND
+        value: "django.core.mail.backends.smtp.EmailBackend"
+      - key: DEFAULT_FROM_EMAIL
+        value: "no-reply@example.edu"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "true"
+      - key: LTI_PRIVATE_KEY_PATH
+        value: "/etc/secrets/lti_private.pem"
+      - key: LTI_PUBLIC_KEY_PATH
+        value: "/etc/secrets/lti_public.pem"
+      - key: LTI_ISS
+        sync: false
+      - key: LTI_CLIENT_ID
+        sync: false
+      - key: LTI_DEPLOYMENT_ID
+        sync: false
+      - key: LTI_PLATFORM_JWKS_URL
+        sync: false
+      - key: LTI_PLATFORM_AUTHORIZE_URL
+        sync: false
+      - key: LTI_REDIRECT_URI
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+    disk:
+      name: media
+      mountPath: /var/data
+      sizeGB: 10
+    secretFiles:
+      - name: lti-private-key
+        mountPath: /etc/secrets/lti_private.pem
+      - name: lti-public-key
+        mountPath: /etc/secrets/lti_public.pem

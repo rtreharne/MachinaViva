@@ -1,4 +1,5 @@
 import secrets, jwt
+import os
 from datetime import datetime, timedelta
 from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseBadRequest
@@ -8,12 +9,16 @@ from jwcrypto import jwk
 from tool.models import ToolConfig   # <-- NEW
 
 
+LTI_PRIVATE_KEY_PATH = os.getenv("LTI_PRIVATE_KEY_PATH", "lti_keys/private.pem")
+LTI_PUBLIC_KEY_PATH = os.getenv("LTI_PUBLIC_KEY_PATH", "lti_keys/public.pem")
+
+
 def build_deep_link_jwt(return_url, title, launch_url, description="", custom_params=None):
     now = datetime.utcnow()
 
     # Load private/public key
-    private_key = open("lti_keys/private.pem", "rb").read()
-    pub = jwk.JWK.from_pem(open("lti_keys/public.pem", "rb").read())
+    private_key = open(LTI_PRIVATE_KEY_PATH, "rb").read()
+    pub = jwk.JWK.from_pem(open(LTI_PUBLIC_KEY_PATH, "rb").read())
     kid = pub.export_public(as_dict=True)["kid"]
 
     # Deep linking content item

@@ -12,9 +12,12 @@ def is_admin_role(roles):
 def is_student_role(roles):
     return not is_instructor_role(roles) and not is_admin_role(roles)
 
+import os
 import time, jwt, requests
 from django.conf import settings
 from tool.models import ToolConfig, UserProfile
+
+LTI_PRIVATE_KEY_PATH = os.getenv("LTI_PRIVATE_KEY_PATH", "lti_keys/private.pem")
 
 
 def fetch_nrps_roster(nrps_url):
@@ -37,7 +40,7 @@ def fetch_nrps_roster(nrps_url):
     # ----------------------------------------------------------
     # Build client_assertion JWT for Canvas token endpoint
     # ----------------------------------------------------------
-    private_key = open("lti_keys/private.pem", "rb").read()
+    private_key = open(LTI_PRIVATE_KEY_PATH, "rb").read()
 
     client_assertion_payload = {
         "iss": platform.client_id,          # tool's client_id
