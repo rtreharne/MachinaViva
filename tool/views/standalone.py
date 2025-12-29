@@ -9,7 +9,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -178,12 +178,36 @@ UK_HE_INSTITUTIONS = [
     "Other",
 ]
 
+TERMS_VERSION = "2025-01-01"
+PRIVACY_VERSION = "2025-01-01"
+
 
 def _ensure_profile(user, role):
     profile, created = UserProfile.objects.get_or_create(
         user=user, defaults={"role": role}
     )
     return profile
+
+
+def _get_or_create_test_student(assignment):
+    username = f"test-student-{assignment.id}"
+    user = User.objects.filter(username=username).first()
+    if not user:
+        user = User.objects.create(username=username, email="")
+        user.set_unusable_password()
+        user.first_name = "Test"
+        user.last_name = "Student"
+        user.save(update_fields=["password", "first_name", "last_name"])
+    _ensure_profile(user, UserProfile.ROLE_STUDENT)
+    return user
+
+
+def _record_terms_acceptance(profile):
+    if not profile:
+        return
+    profile.terms_accepted_at = now()
+    profile.terms_version = TERMS_VERSION
+    profile.save(update_fields=["terms_accepted_at", "terms_version"])
 
 
 def _generate_slug(title: str) -> str:
@@ -278,9 +302,18 @@ def standalone_signup(request):
         name = (request.POST.get("name") or "").strip()
         institution_type = (request.POST.get("institution_type") or "").strip()
         institution_name = (request.POST.get("institution_name") or "").strip()
+        accept_terms = request.POST.get("accept_terms") == "on"
+        accept_privacy = request.POST.get("accept_privacy") == "on"
 
         if not email or not password:
             error = "Email and password are required."
+        elif not accept_terms or not accept_privacy:
+            if not accept_terms and not accept_privacy:
+                error = "Please accept the Terms and Conditions and the Privacy Policy to continue."
+            elif not accept_terms:
+                error = "Please accept the Terms and Conditions to continue."
+            else:
+                error = "Please accept the Privacy Policy to continue."
         elif User.objects.filter(email__iexact=email).exists():
             error = "An account with that email already exists. Please log in."
         elif User.objects.filter(username__iexact=email).exists():
@@ -297,6 +330,8 @@ def standalone_signup(request):
                     "error": error,
                     "institution_types": INSTITUTION_TYPES,
                     "uk_he_institutions": UK_HE_INSTITUTIONS,
+                    "accept_terms": accept_terms,
+                    "accept_privacy": accept_privacy,
                 })
             user.is_active = False  # require verification
             if name:
@@ -314,6 +349,7 @@ def standalone_signup(request):
             profile.verification_token = token
             profile.verification_sent_at = now()
             profile.save(update_fields=["institution_type", "institution_name", "verification_token", "verification_sent_at"])
+            _record_terms_acceptance(profile)
             _send_verification_email(request, user, token)
             return render(request, "tool/standalone_signup_pending.html", {"email": email})
 
@@ -321,6 +357,8 @@ def standalone_signup(request):
         "error": error,
         "institution_types": INSTITUTION_TYPES,
         "uk_he_institutions": UK_HE_INSTITUTIONS,
+        "accept_terms": request.POST.get("accept_terms") == "on" if request.method == "POST" else False,
+        "accept_privacy": request.POST.get("accept_privacy") == "on" if request.method == "POST" else False,
     })
 
 
@@ -361,6 +399,18 @@ def standalone_login(request):
     return render(request, "tool/standalone_login.html", {
         "error": error,
         "next": next_url,
+    })
+
+
+def standalone_terms(request):
+    return render(request, "tool/standalone_terms.html", {
+        "terms_version": TERMS_VERSION,
+    })
+
+
+def standalone_privacy(request):
+    return render(request, "tool/standalone_privacy.html", {
+        "privacy_version": PRIVACY_VERSION,
     })
 
 
@@ -516,6 +566,53 @@ def standalone_assignment_entry(request, slug):
 
 
 @login_required
+def standalone_view_as_student(request, slug):
+    assignment = get_object_or_404(Assignment, slug=slug, owner=request.user)
+    try:
+        profile = request.user.profile
+    except Exception:
+        return redirect("standalone_login")
+    if profile.role != UserProfile.ROLE_INSTRUCTOR:
+        return redirect("standalone_student_assignments")
+
+    test_user = _get_or_create_test_student(assignment)
+    AssignmentMembership.objects.get_or_create(
+        assignment=assignment,
+        user=test_user,
+        defaults={"role": AssignmentMembership.ROLE_STUDENT, "invited_by": request.user},
+    )
+
+    request.session["standalone_view_as_student"] = True
+    request.session["standalone_view_as_student_id"] = str(test_user.id)
+    request.session["standalone_view_as_student_name"] = test_user.get_full_name() or "Test Student"
+    request.session["standalone_view_as_student_assignment"] = assignment.slug
+    request.session["standalone_from_dashboard"] = False
+
+    set_standalone_session(request, test_user, assignment, force_instructor=False, roles_override=["Learner"])
+    return redirect("assignment_view")
+
+
+@login_required
+def standalone_exit_student_view(request, slug):
+    assignment = get_object_or_404(Assignment, slug=slug, owner=request.user)
+    try:
+        profile = request.user.profile
+    except Exception:
+        return redirect("standalone_login")
+    if profile.role != UserProfile.ROLE_INSTRUCTOR:
+        return redirect("standalone_student_assignments")
+
+    request.session.pop("standalone_view_as_student", None)
+    request.session.pop("standalone_view_as_student_id", None)
+    request.session.pop("standalone_view_as_student_name", None)
+    request.session.pop("standalone_view_as_student_assignment", None)
+    request.session["standalone_from_dashboard"] = True
+
+    set_standalone_session(request, request.user, assignment, force_instructor=True)
+    return redirect("assignment_view")
+
+
+@login_required
 def standalone_self_enroll_manage(request, slug):
     assignment = get_object_or_404(Assignment, slug=slug, owner=request.user)
     try:
@@ -571,13 +668,16 @@ def standalone_self_enroll(request, token):
         email = (request.POST.get("email") or "").strip().lower()
         password = (request.POST.get("password") or "").strip()
         user = None
+        accept_terms = request.POST.get("accept_terms") == "on"
 
         if not email or not password:
             error = "Email and password are required."
         elif allowed_domain and not _domain_allowed(email, allowed_domain):
             error = f"Email must end with @{allowed_domain} to join this assignment."
         elif action == "register":
-            if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
+            if not accept_terms:
+                error = "Please accept the Terms and Conditions to continue."
+            elif User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
                 error = "An account with that email already exists. Please log in."
             else:
                 try:
@@ -592,7 +692,8 @@ def standalone_self_enroll(request, token):
                         user.last_name = parts[1]
                     user.save(update_fields=["first_name", "last_name"])
                 if user:
-                    _ensure_profile(user, UserProfile.ROLE_STUDENT)
+                    profile = _ensure_profile(user, UserProfile.ROLE_STUDENT)
+                    _record_terms_acceptance(profile)
         elif action == "login":
             try:
                 existing = User.objects.get(email__iexact=email)
@@ -629,6 +730,7 @@ def standalone_self_enroll(request, token):
         "allowed_domain": allowed_domain,
         "error": error,
         "logged_in_user": logged_in_user,
+        "accept_terms": request.POST.get("accept_terms") == "on" if request.method == "POST" else False,
     })
 
 
@@ -767,6 +869,11 @@ def standalone_invite_resend(request, invite_id):
     invite.invited_by = request.user
     invite.save(update_fields=["token", "expires_at", "last_sent_at", "invited_by"])
     _send_invite_email(request, invite)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.headers.get("accept") == "application/json":
+        return JsonResponse({
+            "status": "ok",
+            "resent_at": invite.last_sent_at.isoformat() if invite.last_sent_at else "",
+        })
     return redirect("standalone_invites", slug=invite.assignment.slug)
 
 
@@ -782,10 +889,13 @@ def accept_invite(request, token):
         password = (request.POST.get("password") or "").strip()
         name = (request.POST.get("name") or "").strip()
         user = None
+        accept_terms = request.POST.get("accept_terms") == "on"
 
         if action == "register":
             if not password:
                 error = "Password is required."
+            elif not accept_terms:
+                error = "Please accept the Terms and Conditions to continue."
             elif User.objects.filter(email__iexact=invite.email).exists():
                 error = "An account with this email already exists. Please log in."
             elif User.objects.filter(username__iexact=invite.email).exists():
@@ -806,7 +916,8 @@ def accept_invite(request, token):
                     if len(parts) > 1:
                         user.last_name = parts[1]
                     user.save(update_fields=["first_name", "last_name"])
-                _ensure_profile(user, profile_role)
+                profile = _ensure_profile(user, profile_role)
+                _record_terms_acceptance(profile)
         elif action == "login":
             try:
                 existing = User.objects.get(email__iexact=invite.email)
@@ -839,6 +950,7 @@ def accept_invite(request, token):
         "invite": invite,
         "expired": expired,
         "error": error,
+        "accept_terms": request.POST.get("accept_terms") == "on" if request.method == "POST" else False,
     })
 
 

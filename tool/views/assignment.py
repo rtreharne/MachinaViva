@@ -238,6 +238,8 @@ def assignment_view(request):
     resource_link_id = request.session.get("lti_resource_link_id")
     roles = request.session.get("lti_roles", [])
     user_id = request.session.get("lti_user_id")
+    view_as_student = bool(request.session.get("standalone_view_as_student"))
+    view_as_student_assignment = request.session.get("standalone_view_as_student_assignment")
     print("DEBUG: nrps_url in session =", request.session.get("nrps_url"))
 
     if not resource_link_id:
@@ -264,6 +266,12 @@ def assignment_view(request):
         print(f"Updating assignment title → {deep_title}")
         assignment.title = deep_title
         assignment.save()
+
+    if view_as_student and view_as_student_assignment and view_as_student_assignment != assignment.slug:
+        view_as_student = False
+        request.session.pop("standalone_view_as_student", None)
+        request.session.pop("standalone_view_as_student_id", None)
+        request.session.pop("standalone_view_as_student_assignment", None)
 
     # --------------------------------------------------------------
     # Apply deep link custom settings on first creation
@@ -378,6 +386,12 @@ def assignment_view(request):
             and not request.session.get("lti_claims")
         )
     )
+    if view_as_student:
+        from_standalone = False
+        roles = ["Learner"]
+        override_user_id = request.session.get("standalone_view_as_student_id")
+        if override_user_id:
+            user_id = override_user_id
 
     if is_instructor_role(roles) or is_admin_role(roles) or from_standalone:
         submissions = Submission.objects.filter(
@@ -476,7 +490,7 @@ def assignment_view(request):
             for inv in invite_qs_pending:
                 pending_invites.append({
                     "email": inv.email,
-                    "status": "Expired" if inv.is_expired else "Pending",
+                    "status": "Expired" if inv.is_expired else "Invite pending",
                     "invite_id": inv.id,
                 })
 
@@ -709,17 +723,17 @@ def assignment_view(request):
                     "vivas": [],
                     "is_invite": True,
                     "invite_id": inv.id,
-                    "invite_status": "Expired" if inv.is_expired else "Pending",
+                    "invite_status": "Expired" if inv.is_expired else "Invite pending",
                 })
 
-            # Float accepted invites to the top, then invited, then others
-            students = sorted(
-                students,
-                key=lambda s: (
-                    0 if s.get("accepted_invite") else (1 if s.get("is_invite") else 2),
-                    s.get("name", "").lower(),
-                )
-            )
+            # Keep invite rows at the bottom while preserving alphabetical order.
+            def sort_key(entry):
+                is_invite = bool(entry.get("is_invite"))
+                group = 2 if is_invite else (0 if entry.get("accepted_invite") else 1)
+                return (group, (entry.get("name") or "").lower())
+
+            students = sorted(students, key=sort_key)
+            dashboard_data["students"] = students
 
         self_enroll_link = ""
         self_enroll_iframe = ""
@@ -991,15 +1005,24 @@ def assignment_view(request):
 
     user_email = ""
     logout_url = ""
-    if request.user.is_authenticated:
+    view_as_student_name = ""
+    if view_as_student:
+        view_as_student_name = request.session.get("standalone_view_as_student_name") or "Test Student"
+        user_email = view_as_student_name
+    elif request.user.is_authenticated:
         user_email = request.user.email or request.user.username or ""
         logout_url = "standalone_logout"
+
+    standalone_student = bool(view_as_student or (request.user.is_authenticated and not request.session.get("lti_claims")))
 
     return render(request, "tool/student_submit.html", {
         "assignment": assignment,
         "user_id": user_id,
         "user_email": user_email,
         "logout_url": logout_url,
+        "view_as_student": view_as_student,
+        "view_as_student_name": view_as_student_name,
+        "standalone_student": standalone_student,
         "latest_submission": latest,
         "past_submissions": student_submissions,
         "submission_payloads": submission_payloads,

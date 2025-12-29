@@ -14,10 +14,17 @@
 <div class="page page-with-footer">
 
     <header class="nav nav-spread">
-        <div class="brand">
-            <span class="brand-mark">MV</span>
-            <span>MachinaViva</span>
-        </div>
+        {% if from_standalone %}
+            <a class="brand" href="{% url 'landing_home' %}" aria-label="MachinaViva home">
+                <span class="brand-mark">MV</span>
+                <span>MachinaViva</span>
+            </a>
+        {% else %}
+            <div class="brand">
+                <span class="brand-mark">MV</span>
+                <span>MachinaViva</span>
+            </div>
+        {% endif %}
         <div class="nav-actions view-toggle">
             {% if from_standalone %}
                 <a class="view-btn" href="{% url 'standalone_app_home' %}">My assignments</a>
@@ -39,6 +46,7 @@
         <div class="standalone-header">
             <div>
                 <h2>{{ assignment.title|default:"Viva assignment" }}</h2>
+                <p class="standalone-muted monospace">{{ assignment.slug }}</p>
             </div>
         </div>
         <div class="table-controls table-controls-split">
@@ -53,10 +61,14 @@
                             <path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"></path>
                         </svg>
                     </a>
+                    <a class="view-btn" href="{% url 'standalone_view_as_student' assignment.slug %}">View as student</a>
                 {% endif %}
             </div>
             <div class="table-controls-right" data-dashboard-controls>
                 <input type="search" class="filter-input" placeholder="Filter students by name..." aria-label="Filter students" data-student-filter>
+                {% if from_standalone %}
+                    <button class="view-btn ghost" type="button" data-export-csv aria-label="Export filtered roster CSV">Export CSV</button>
+                {% endif %}
             </div>
         </div>
         <div class="dash-view active" data-view-pane="dashboard">
@@ -65,18 +77,33 @@
                     <div class="table-card">
                         <div class="table-head">
                             <div>Student</div>
-                            <div>Viva</div>
-                            <div>Integrity flags</div>
+                            <div>
+                                <button class="table-filter" type="button" data-filter="viva" aria-pressed="false">
+                                    Viva
+                                    <span class="filter-indicator is-hidden" data-filter-indicator="viva"></span>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="table-filter" type="button" data-filter="flags" aria-pressed="false">
+                                    Integrity flags
+                                    <span class="filter-indicator is-hidden" data-filter-indicator="flags"></span>
+                                </button>
+                            </div>
                         </div>
 
                         {% if students %}
                             {% for student in students %}
-                                <div class="table-row" data-student-row data-student-id="{{ student.user_id }}" data-student-search="{{ student.name|lower }} {{ student.email|default:''|lower }}">
+                                <div class="table-row"
+                                     data-student-row
+                                     data-student-id="{{ student.user_id }}"
+                                     data-student-search="{{ student.name|lower }} {{ student.email|default:''|lower }}"
+                                     data-viva-status="{{ student.status|default:'pending' }}"
+                                     data-has-flags="{% if student.flags %}true{% else %}false{% endif %}">
                                     <div class="viva-cell" data-label="Student">
                                         {% if student.is_invite %}
                                             <span class="monospace">{{ student.name }}</span>
                                             {% if student.invite_status != "Accepted" %}
-                                                <span class="pill {% if student.invite_status == 'Expired' %}no{% else %}neutral{% endif %}">{{ student.invite_status|default:"Invited" }}</span>
+                                                <span class="pill {% if student.invite_status == 'Expired' %}no{% else %}neutral{% endif %}" data-invite-status-pill>{{ student.invite_status|default:"Invited" }}</span>
                                             {% endif %}
                                         {% else %}
                                             {{ student.name }}
@@ -95,16 +122,23 @@
                                             <span class="link disabled">Submitted</span>
                                         {% else %}
                                             {% if student.is_invite and student.invite_id and student.invite_status != "Accepted" %}
-                                                <a class="pill neutral" href="{% url 'standalone_invite_resend' student.invite_id %}">Re-send</a>
+                                                <a class="pill neutral" href="{% url 'standalone_invite_resend' student.invite_id %}" data-invite-resend>Re-send</a>
                                             {% else %}
                                                 <span class="viva-status no" aria-label="Pending"></span>
-                                                <span class="link disabled">Pending</span>
+                                                <span class="link disabled">Viva pending</span>
                                             {% endif %}
                                         {% endif %}
                                     </div>
                                     <div class="flag {% if student.flags %}warn{% else %}none{% endif %}" data-label="Integrity flags">
                                         {% if student.flags %}
-                                            {{ student.flags|length }} flag{% if student.flags|length != 1 %}s{% endif %}
+                                            <details class="flag-details">
+                                                <summary>{{ student.flags|length }} flag{% if student.flags|length != 1 %}s{% endif %}</summary>
+                                                <ul>
+                                                    {% for item in student.flags %}
+                                                        <li>{{ item }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </details>
                                         {% else %}
                                             None
                                         {% endif %}
@@ -437,7 +471,7 @@
     </section>
 
     <footer class="footer">
-        <p>© 2025 MachinaViva · Authentic viva assessments for the AI era.</p>
+        <p>© 2025 MachinaViva</p>
     </footer>
 </div>
 

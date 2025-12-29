@@ -235,6 +235,8 @@ class UserProfile(models.Model):
     verification_token = models.CharField(max_length=100, blank=True)
     verification_sent_at = models.DateTimeField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    terms_version = models.CharField(max_length=32, blank=True)
 
     def __str__(self):
         return f"{self.user.email or self.user.username} ({self.get_role_display()})"

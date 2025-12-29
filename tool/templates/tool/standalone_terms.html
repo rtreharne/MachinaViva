@@ -1,0 +1,51 @@
+{% extends "tool/standalone_base.html" %}
+{% block page_title %}Terms and Conditions{% endblock %}
+{% block content %}
+<div class="standalone-header">
+    <div>
+        <p class="eyebrow">Terms</p>
+        <h2>Terms and Conditions</h2>
+        <p class="lede">Please read before creating an account.</p>
+    </div>
+</div>
+
+<div class="settings-form-card">
+    <div class="settings-card-head">
+        <h3 class="settings-title">Effective date {{ terms_version }}</h3>
+    </div>
+    <div class="terms-content">
+        <p>These terms apply to all users of MachinaViva. By creating an account you confirm that you have read, understood, and agree to these terms.</p>
+
+        <h4>General</h4>
+        <ul>
+            <li>Keep your account details secure and use the service only for lawful, educational purposes.</li>
+            <li>We may update these terms from time to time. We will ask you to accept the new version when required.</li>
+            <li>AI feedback is automated and may contain errors. It should not be used as the sole basis for high stakes decisions.</li>
+        </ul>
+
+        <h4>For instructors</h4>
+        <ul>
+            <li>You confirm you have the right to upload materials and to invite learners to participate.</li>
+            <li>You are responsible for configuring assignments and for reviewing feedback before releasing it when needed.</li>
+            <li>You will use outputs to support learning and assessment and not to replace your professional judgment.</li>
+        </ul>
+
+        <h4>For students</h4>
+        <ul>
+            <li>You confirm that responses are your own work and that you will not impersonate another person.</li>
+            <li>You will follow the rules set by your instructor for each assignment.</li>
+            <li>You understand that interaction signals may be recorded to support academic integrity.</li>
+        </ul>
+
+        <h4>Data and privacy</h4>
+        <ul>
+            <li>We store submissions, transcripts, feedback, and integrity signals to provide the service.</li>
+            <li>Instructors control visibility of feedback and transcripts for their assignments.</li>
+            <li>Submissions and transcripts may be processed by third party AI providers, including OpenAI, to generate questions and feedback.</li>
+            <li>If you do not agree to this processing you should not create an account.</li>
+        </ul>
+
+        <p>If you have questions about these terms, please contact your institution or the MachinaViva team.</p>
+    </div>
+</div>
+{% endblock %}

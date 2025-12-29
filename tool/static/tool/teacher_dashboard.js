@@ -12,6 +12,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const tableNote = document.querySelector("[data-table-note]");
     const tableNoteTop = document.querySelector("[data-table-note-top]");
     const filterInput = document.querySelector("[data-student-filter]");
+    const exportBtn = document.querySelector("[data-export-csv]");
+    const vivaFilterBtn = document.querySelector("[data-filter='viva']");
+    const flagsFilterBtn = document.querySelector("[data-filter='flags']");
+    const vivaFilterIndicator = document.querySelector("[data-filter-indicator='viva']");
+    const flagsFilterIndicator = document.querySelector("[data-filter-indicator='flags']");
     const dashboardControls = document.querySelector("[data-dashboard-controls]");
     const transcriptSelect = document.querySelector("[data-transcript-select]");
     const attemptSelect = document.querySelector("[data-attempt-select]");
@@ -66,6 +71,59 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (dashboardControls) {
             dashboardControls.classList.toggle("is-hidden", target !== "dashboard");
+        }
+    };
+
+    const getRowEls = () => Array.from(document.querySelectorAll("[data-student-row]"));
+    const getRowHaystack = (row) => {
+        const search = row.dataset.studentSearch || "";
+        const name = row.querySelector("div")?.textContent?.toLowerCase() || "";
+        return `${search} ${name}`.trim();
+    };
+    const vivaStates = ["all", "completed", "in_progress", "submitted", "pending", "invited"];
+    const vivaStateLabels = {
+        all: "All",
+        completed: "Completed",
+        in_progress: "In progress",
+        submitted: "Submitted",
+        pending: "Viva pending",
+        invited: "Invite pending",
+    };
+    const flagStates = ["all", "flagged"];
+    const flagStateLabels = {
+        all: "All",
+        flagged: "Flagged",
+    };
+    let vivaStateIndex = 0;
+    let flagStateIndex = 0;
+
+    const applyRowFilters = () => {
+        const term = filterInput?.value.trim().toLowerCase() || "";
+        const vivaState = vivaStates[vivaStateIndex];
+        const flagState = flagStates[flagStateIndex];
+
+        getRowEls().forEach((row) => {
+            const matchesSearch = !term || getRowHaystack(row).includes(term);
+            const status = (row.dataset.vivaStatus || "").toLowerCase();
+            const hasFlags = row.dataset.hasFlags === "true";
+            const matchesViva = vivaState === "all" || status === vivaState;
+            const matchesFlags = flagState === "all" || (flagState === "flagged" && hasFlags);
+            row.style.display = matchesSearch && matchesViva && matchesFlags ? "" : "none";
+        });
+
+        if (vivaFilterIndicator) {
+            vivaFilterIndicator.textContent = vivaStateLabels[vivaStates[vivaStateIndex]] || "All";
+            vivaFilterIndicator.classList.toggle("is-hidden", vivaStates[vivaStateIndex] === "all");
+        }
+        if (flagsFilterIndicator) {
+            flagsFilterIndicator.textContent = flagStateLabels[flagStates[flagStateIndex]] || "All";
+            flagsFilterIndicator.classList.toggle("is-hidden", flagStates[flagStateIndex] === "all");
+        }
+        if (vivaFilterBtn) {
+            vivaFilterBtn.setAttribute("aria-pressed", vivaStates[vivaStateIndex] !== "all");
+        }
+        if (flagsFilterBtn) {
+            flagsFilterBtn.setAttribute("aria-pressed", flagStates[flagStateIndex] !== "all");
         }
     };
 
@@ -626,6 +684,114 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const findStudent = (userId) => students.find(s => String(s.user_id) === String(userId));
 
+    const statusLabels = {
+        completed: "Completed",
+        in_progress: "In progress",
+        submitted: "Submitted",
+        pending: "Viva pending",
+        invited: "Invite pending",
+    };
+
+    const formatStatusLabel = (status) => {
+        if (!status) return "";
+        return statusLabels[status] || status.replace(/_/g, " ");
+    };
+
+    const formatFlags = (flags) => {
+        if (!Array.isArray(flags) || !flags.length) return "";
+        return flags.filter(Boolean).join(" | ");
+    };
+
+    const formatCsvValue = (value) => {
+        if (value === null || value === undefined) return "";
+        const text = String(value);
+        if (/[",\r\n]/.test(text)) {
+            return `"${text.replace(/"/g, "\"\"")}"`;
+        }
+        return text;
+    };
+
+    const getVisibleStudentRows = () => getRowEls().filter(row => row.style.display !== "none");
+
+    const getFilteredStudents = () => {
+        return getVisibleStudentRows()
+            .map(row => findStudent(row.dataset.studentId))
+            .filter(Boolean);
+    };
+
+    const buildRosterCsvRows = (studentList) => {
+        const rows = [];
+        rows.push([
+            "Student name",
+            "Student email",
+            "Student id",
+            "Viva status",
+            "Invite status",
+            "Integrity flags",
+            "Attempt number",
+            "Attempt id",
+            "Attempt status",
+            "Attempt created at",
+            "Attempt duration seconds",
+            "Attempt flags",
+        ]);
+
+        studentList.forEach((student) => {
+            const base = [
+                student?.name || "",
+                student?.email || "",
+                student?.user_id || "",
+                formatStatusLabel(student?.status),
+                student?.invite_status || "",
+                formatFlags(student?.flags),
+            ];
+            const attempts = getAttempts(student);
+            if (!attempts.length) {
+                rows.push([...base, "", "", "", "", "", ""]);
+                return;
+            }
+            const total = attempts.length;
+            attempts.forEach((attempt, idx) => {
+                rows.push([
+                    ...base,
+                    String(total - idx),
+                    attempt?.session_id || "",
+                    formatStatusLabel(attempt?.status),
+                    attempt?.created_at || "",
+                    attempt?.duration_seconds ?? "",
+                    formatFlags(attempt?.flags),
+                ]);
+            });
+        });
+
+        return rows;
+    };
+
+    const downloadCsv = (filename, rows) => {
+        const csv = rows.map(row => row.map(formatCsvValue).join(",")).join("\r\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    if (exportBtn) {
+        exportBtn.addEventListener("click", () => {
+            const filteredStudents = getFilteredStudents();
+            const slugRaw = data?.assignment?.slug || "assignment";
+            const slug = String(slugRaw).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "assignment";
+            const date = new Date().toISOString().slice(0, 10);
+            const filename = `roster-${slug}-${date}.csv`;
+            const rows = buildRosterCsvRows(filteredStudents);
+            downloadCsv(filename, rows);
+        });
+    }
+
     const attachRowHandlers = () => {
         document.querySelectorAll("[data-view-transcript]").forEach(link => {
             link.addEventListener("click", (e) => {
@@ -685,26 +851,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (filterInput) {
-        const rows = () => Array.from(document.querySelectorAll("[data-student-row]"));
         const opts = () => Array.from(transcriptSelect ? transcriptSelect.querySelectorAll("option") : []);
 
         filterInput.addEventListener("input", (e) => {
             const term = e.target.value.trim().toLowerCase();
-
-            rows().forEach(row => {
-                const search = row.dataset.studentSearch || "";
-                const name = row.querySelector("div")?.textContent?.toLowerCase() || "";
-                const haystack = `${search} ${name}`.trim();
-                row.style.display = term && !haystack.includes(term) ? "none" : "";
-            });
 
             opts().forEach(opt => {
                 if (!opt.value) return;
                 const label = opt.textContent.toLowerCase();
                 opt.hidden = term && !label.includes(term);
             });
+
+            applyRowFilters();
         });
     }
+
+    if (vivaFilterBtn) {
+        vivaFilterBtn.addEventListener("click", () => {
+            vivaStateIndex = (vivaStateIndex + 1) % vivaStates.length;
+            applyRowFilters();
+        });
+    }
+
+    if (flagsFilterBtn) {
+        flagsFilterBtn.addEventListener("click", () => {
+            flagStateIndex = (flagStateIndex + 1) % flagStates.length;
+            applyRowFilters();
+        });
+    }
+
+    applyRowFilters();
 
     if (backToTop) {
         const carouselTop = document.querySelector(".carousel");
@@ -767,6 +943,59 @@ document.addEventListener("DOMContentLoaded", () => {
                 setStatus(statusEl, "Connection issue. Trying again...", "error");
                 form.submit();
             }
+        });
+    };
+
+    const bindInviteResends = () => {
+        const resendLinks = document.querySelectorAll("[data-invite-resend]");
+        resendLinks.forEach((link) => {
+            const originalText = link.textContent.trim() || "Re-send";
+            link.addEventListener("click", async (e) => {
+                e.preventDefault();
+                if (link.dataset.sending === "true") return;
+                link.dataset.sending = "true";
+                link.textContent = "Sending...";
+                link.classList.remove("yes", "no");
+                link.classList.add("neutral");
+
+                try {
+                    const resp = await fetch(link.href, {
+                        method: "GET",
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        credentials: "same-origin",
+                    });
+                    if (!resp.ok) {
+                        const text = await resp.text();
+                        throw new Error(text || "Resend failed");
+                    }
+                    link.textContent = "Re-sent";
+                    link.classList.remove("neutral");
+                    link.classList.add("yes");
+                    const row = link.closest("[data-student-row]");
+                    const statusPill = row?.querySelector("[data-invite-status-pill]");
+                    if (statusPill) {
+                        statusPill.textContent = "Invite pending";
+                        statusPill.classList.remove("no");
+                        statusPill.classList.add("neutral");
+                    }
+                    setTimeout(() => {
+                        link.textContent = originalText;
+                        link.classList.remove("yes");
+                        link.classList.add("neutral");
+                        link.dataset.sending = "";
+                    }, 60000);
+                } catch (err) {
+                    link.textContent = "Failed";
+                    link.classList.remove("neutral");
+                    link.classList.add("no");
+                    setTimeout(() => {
+                        link.textContent = originalText;
+                        link.classList.remove("no");
+                        link.classList.add("neutral");
+                        link.dataset.sending = "";
+                    }, 60000);
+                }
+            });
         });
     };
 
@@ -1020,6 +1249,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     attachAjaxForm(inviteForm, inviteStatus);
     attachAjaxForm(selfEnrollForm, selfEnrollStatus);
+    bindInviteResends();
 
     if (teacherFeedbackForm && teacherFeedbackInput) {
         teacherFeedbackForm.addEventListener("submit", async (e) => {

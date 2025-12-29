@@ -36,6 +36,12 @@
                     <label for="password">Password</label>
                     <input id="password" name="password" type="password" required>
                 </div>
+                <div class="consent-row">
+                    <input id="accept_terms" name="accept_terms" type="checkbox" required {% if accept_terms %}checked{% endif %}>
+                    <label for="accept_terms">
+                        I have read and accept the <a class="link" href="{% url 'standalone_terms' %}" target="_blank" rel="noopener">Terms and Conditions</a>.
+                    </label>
+                </div>
                 <div class="settings-actions">
                     <button type="submit" class="view-btn">Create account &amp; continue</button>
                 </div>

@@ -1,0 +1,124 @@
+{% extends "tool/standalone_base.html" %}
+{% block page_title %}Privacy Policy{% endblock %}
+{% block content %}
+<div class="standalone-header">
+    <div>
+        <p class="eyebrow">Privacy</p>
+        <h2>Privacy Policy</h2>
+        <p class="lede">How we handle personal data in the standalone app.</p>
+    </div>
+</div>
+
+<div class="settings-form-card">
+    <div class="settings-card-head">
+        <h3 class="settings-title">Effective date {{ privacy_version }}</h3>
+    </div>
+    <div class="terms-content">
+        <p>This policy explains how MachinaViva processes personal data for the standalone application. If you access MachinaViva through an institution or LMS, a separate notice may apply.</p>
+
+        <h4>Controller and contact</h4>
+        <p>MachinaViva is the data controller for standalone accounts. Contact us at hello@machinaviva.co.uk.</p>
+
+        <h4>UK GDPR transparency</h4>
+        <p>This policy is provided under Articles 13 and 14 of the UK GDPR. It identifies the controller, categories of personal data, purposes and lawful bases, recipients, retention, international transfers where applicable, and your rights.</p>
+
+        <h4>Data we collect</h4>
+        <ul>
+            <li>Account details such as name, email, role, and institution information.</li>
+            <li>Assignment content, uploads, transcripts, viva messages, and feedback.</li>
+            <li>Invite data such as email address, token, and acceptance status.</li>
+            <li>Integrity signals such as focus, paste, and interaction logs.</li>
+            <li>Usage data such as pages viewed, device type, and browser details.</li>
+            <li>Support communications you send to us.</li>
+        </ul>
+
+        <h4>Sources of data</h4>
+        <ul>
+            <li>Directly from you when you create an account or submit work.</li>
+            <li>From instructors who create assignments and send invites.</li>
+            <li>From your device and browser when you use the service.</li>
+        </ul>
+
+        <h4>How we use data</h4>
+        <ul>
+            <li>Provide the service, including authentication and assignment delivery.</li>
+            <li>Generate viva questions and AI feedback.</li>
+            <li>Support academic integrity and auditing.</li>
+            <li>Send verification, invite, and service related emails.</li>
+            <li>Maintain security, abuse prevention, and service reliability.</li>
+        </ul>
+
+        <h4>Lawful bases</h4>
+        <ul>
+            <li>Contract, to deliver the service you request.</li>
+            <li>Legitimate interests, to secure and improve the platform and protect academic integrity.</li>
+            <li>Legal obligation, where required by law.</li>
+            <li>Consent, only where required for non essential cookies or marketing.</li>
+        </ul>
+
+        <h4>AI processing and automated outputs</h4>
+        <p>We use AI providers to generate viva questions and feedback. This may involve sending submission and transcript content to those providers under contract. AI outputs are advisory and should not be the sole basis for high stakes decisions.</p>
+        <p>We send submissions and transcripts to OpenAI via API to generate viva questions and feedback. OpenAI processes this data under its API data usage policy and retention practices, which may vary by plan.</p>
+
+        <h4>Integrity signals</h4>
+        <p>We collect interaction signals to support academic integrity. Instructors can enable or disable these signals per assignment. We do not use these signals for automated decisions that produce legal or similarly significant effects.</p>
+
+        <h4>Sharing and processors</h4>
+        <p>We use trusted providers for hosting, email delivery, and AI services. Our AI provider is OpenAI. We do not sell personal data. A list of sub processors is available on request.</p>
+
+        <h4>International transfers</h4>
+        <p>If data is processed outside the UK or EEA, we use appropriate safeguards such as UK IDTA or EU SCCs.</p>
+
+        <h4>Security</h4>
+        <p>We use technical and organizational measures such as access controls, encryption in transit, and audit logging to protect data.</p>
+
+        <h4>Retention</h4>
+        <p>We keep data only as long as necessary for the purposes above. Typical retention periods are:</p>
+        <ul>
+            <li>Account data while the account is active, then up to 24 months after closure unless required by law.</li>
+            <li>Submissions, transcripts, and feedback for the assignment duration and up to 24 months after the last activity.</li>
+            <li>Invites and verification tokens up to 12 months after expiry.</li>
+            <li>Integrity and interaction logs up to 12 months after the related viva attempt.</li>
+            <li>Backups for up to 30 days.</li>
+        </ul>
+        <p>We may retain data longer for legal claims, compliance, or if you request extended storage.</p>
+
+        <h4>Cookies and local storage</h4>
+        <p>We use essential cookies and local storage to operate the service and remember preferences. We do not use marketing cookies.</p>
+        <div class="policy-table">
+            <div class="policy-row policy-head">
+                <span>Name</span>
+                <span>Type</span>
+                <span>Purpose</span>
+            </div>
+            <div class="policy-row">
+                <span>sessionid</span>
+                <span>Cookie</span>
+                <span>Authenticate your session and keep you signed in.</span>
+            </div>
+            <div class="policy-row">
+                <span>csrftoken</span>
+                <span>Cookie</span>
+                <span>Protect against cross site request forgery attacks.</span>
+            </div>
+            <div class="policy-row">
+                <span>mv-theme</span>
+                <span>Local storage</span>
+                <span>Remember your light or dark theme preference.</span>
+            </div>
+        </div>
+
+        <h4>Your rights</h4>
+        <p>You may request access, correction, deletion, restriction, portability, or objection where applicable. Contact hello@machinaviva.co.uk.</p>
+
+        <h4>Complaints</h4>
+        <p>If you are in the UK you can contact the Information Commissioner's Office at https://ico.org.uk.</p>
+
+        <h4>Children</h4>
+        <p>This service is intended for higher education and professional use. If you are under 18, you should only use the service with consent from your parent or guardian and your institution.</p>
+
+        <h4>Changes</h4>
+        <p>We may update this policy. We will post updates here and may ask you to acknowledge the new version.</p>
+    </div>
+</div>
+{% endblock %}

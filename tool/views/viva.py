@@ -45,11 +45,22 @@ Ground it only in the submission materials provided. Do not invent details.
 If the materials are insufficient, say so briefly and answer as generally as possible without adding new claims.
 Return only the answer text, with no labels or JSON."""
 
-FEEDBACK_SYSTEM_PROMPT = """You are an academic examiner providing feedback after a student's text-based viva.
-Write a single, concise paragraph of feedback (4-6 sentences).
-Focus on understanding, evidence, clarity, and any gaps to address next time.
+FEEDBACK_SYSTEM_PROMPT = """You are providing feedback after an informal, text-based viva chat.
+Write a single, concise paragraph of feedback (2-4 sentences).
+Be direct and evidence-based. If the student did not answer the questions, went off topic, or provided minimal content, state that plainly and explain that understanding could not be demonstrated.
+Do not add praise or credit that is not supported by the transcript. Avoid generic positivity.
+Do not expect formal academic critique, citations, or theoretical frameworks. Keep the tone practical and conversational.
+Focus on whether the student engaged with the prompts, showed basic understanding, and used relevant details from their submission, then point to 1-2 concrete ways to improve next time.
 Do not mention AI, integrity signals, or the system.
 Do not use bullet points or labels."""
+
+FALLBACK_FEEDBACK = (
+    "Your responses in this viva did not address the questions and were very brief, "
+    "so your understanding of the submission could not be assessed. "
+    "The discussion repeatedly moved away from the prompts instead of engaging with the specific texts or claims. "
+    "To demonstrate understanding, answer the question asked in your own words and use evidence or examples from your submission. "
+    "A future attempt with direct, content-based answers would allow a fair evaluation."
+)
 
 MAX_CONTEXT_CHARS = 12000
 MAX_FILE_CHARS = 4000
@@ -97,6 +108,27 @@ def parse_viva_payload(raw_text):
         if question:
             return question, ""
     return cleaned, ""
+
+
+def _word_count(text):
+    return len(re.findall(r"[A-Za-z0-9']+", text or ""))
+
+
+def _use_feedback_fallback(history):
+    student_texts = [
+        (msg.text or "").strip()
+        for msg in history
+        if (msg.sender or "").lower() != "ai" and (msg.text or "").strip()
+    ]
+    if not student_texts:
+        return True
+    total_words = sum(_word_count(text) for text in student_texts)
+    substantive = sum(1 for text in student_texts if _word_count(text) >= 20)
+    if total_words < 40:
+        return True
+    if substantive == 0 and total_words < 80:
+        return True
+    return False
 
 
 def build_submission_context(session):
@@ -253,6 +285,8 @@ def generate_viva_feedback(session):
     history = list(VivaMessage.objects.filter(session=session).order_by("timestamp"))
     if MAX_HISTORY_MESSAGES and len(history) > MAX_HISTORY_MESSAGES:
         history = history[-MAX_HISTORY_MESSAGES:]
+    if _use_feedback_fallback(history):
+        return FALLBACK_FEEDBACK
     transcript_lines = []
     for msg in history:
         speaker = "AI" if (msg.sender or "").lower() == "ai" else "Student"
