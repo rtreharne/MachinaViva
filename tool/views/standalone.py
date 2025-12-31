@@ -1143,11 +1143,19 @@ def _send_invite_email(request, invite: AssignmentInvitation):
         f"Use this link to accept and create your account or log in:\n{link}\n\n"
         f"This link expires on {invite.expires_at.strftime('%Y-%m-%d %H:%M UTC')}."
     )
+    html_body = (
+        "<p>You have been invited to complete a viva for "
+        f"\"{invite.assignment.title}\".</p>"
+        "<p>Use this link to accept and create your account or log in:<br>"
+        f"<a href=\"{link}\">{link}</a></p>"
+        f"<p>This link expires on {invite.expires_at.strftime('%Y-%m-%d %H:%M UTC')}.</p>"
+    )
     send_mail(
         subject=subject,
         message=body,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         recipient_list=[invite.email],
+        html_message=html_body,
         fail_silently=True,
     )
 
@@ -1161,11 +1169,18 @@ def _send_verification_email(request, user: User, token: str):
         f"{link}\n\n"
         "If you did not request this, you can ignore this email."
     )
+    html_body = (
+        "<p>Welcome to MachinaViva.</p>"
+        "<p>Please verify your email to activate your instructor account:<br>"
+        f"<a href=\"{link}\">{link}</a></p>"
+        "<p>If you did not request this, you can ignore this email.</p>"
+    )
     send_mail(
         subject=subject,
         message=body,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         recipient_list=[user.email],
+        html_message=html_body,
         fail_silently=True,
     )
 
@@ -1177,11 +1192,18 @@ def _send_password_reset_email(user: User, link: str):
         f"Use this link to set a new password:\n{link}\n\n"
         "If you did not request this, you can ignore this email."
     )
+    html_body = (
+        "<p>We received a request to reset the password for your MachinaViva instructor account.</p>"
+        "<p>Use this link to set a new password:<br>"
+        f"<a href=\"{link}\">{link}</a></p>"
+        "<p>If you did not request this, you can ignore this email.</p>"
+    )
     send_mail(
         subject=subject,
         message=body,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         recipient_list=[user.email],
+        html_message=html_body,
         fail_silently=True,
     )
 
@@ -1193,10 +1215,17 @@ def _send_student_password_reset_email(user: User, link: str, assignment_title: 
         f"Use this link to set a new password:\n{link}\n\n"
         "If you did not request this, you can ignore this email."
     )
+    html_body = (
+        f"<p>We received a request to reset the password for your MachinaViva student account for \"{assignment_title}\".</p>"
+        "<p>Use this link to set a new password:<br>"
+        f"<a href=\"{link}\">{link}</a></p>"
+        "<p>If you did not request this, you can ignore this email.</p>"
+    )
     send_mail(
         subject=subject,
         message=body,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         recipient_list=[user.email],
+        html_message=html_body,
         fail_silently=True,
     )
