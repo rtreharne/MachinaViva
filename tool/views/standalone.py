@@ -13,6 +13,7 @@ from django.http import HttpResponseBadRequest, JsonResponse
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.text import slugify
 from django.utils.timezone import now
 from django.core.mail import send_mail
 
@@ -267,7 +268,7 @@ def _record_terms_acceptance(profile):
 
 def _generate_slug(title: str) -> str:
     base = (title or "assignment").strip()
-    base_slug = base.lower().replace(" ", "-")[:40] or "assignment"
+    base_slug = slugify(base)[:40] or "assignment"
     for _ in range(5):
         candidate = f"{base_slug}-{secrets.token_hex(2)}"[:50]
         if not Assignment.objects.filter(slug=candidate).exists():

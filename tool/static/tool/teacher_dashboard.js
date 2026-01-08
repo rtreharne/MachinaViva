@@ -179,6 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const type = event.type || "event";
         const data = event.data || {};
         switch (type) {
+            case "heartbeat":
+                return null;
             case "visibility":
                 return null;
             case "blur":
@@ -537,10 +539,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const isTamperFlag = (text) => /tamper/.test(String(text || "").toLowerCase());
         flags.forEach(flag => {
             const li = document.createElement("li");
             const dot = document.createElement("span");
-            dot.className = "dot warn";
+            dot.className = isTamperFlag(flag) ? "dot danger" : "dot warn";
             li.appendChild(dot);
             li.append(flag);
             transcriptEvents.appendChild(li);

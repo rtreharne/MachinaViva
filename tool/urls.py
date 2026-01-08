@@ -72,6 +72,7 @@ urlpatterns = [
     path("viva/toggle_submission/", views.viva_toggle_submission, name="viva_toggle_submission"),
     path("viva/toggle_resource/", views.viva_toggle_resource, name="viva_toggle_resource"),
     path("viva/log/", views.viva_log_event, name="viva_log_event"),
+    path("viva/ping/", views.viva_ping, name="viva_ping"),
     path("viva/summary/<int:session_id>/", views.viva_summary, name="viva_summary"),
     path("viva/logs/<int:session_id>/", views.viva_logs, name="viva_logs"),
 

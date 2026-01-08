@@ -146,6 +146,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const logQueue = [];
     let logTimer = null;
     let lastArrhythmicLog = 0;
+    const safeAddEventListener = EventTarget.prototype.addEventListener;
+    const shouldHeartbeat = eventTracking || keystrokeTracking || arrhythmicTracking;
+    const jsHeaders = { "X-MV-JS": "1" };
+    let heartbeatNonce = pageEl?.dataset.heartbeatNonce || "";
+    let heartbeatTimer = null;
+    const heartbeatIntervalMs = 8000;
+    let clipboardRebindTimer = null;
+    const clipboardRebindMs = 5000;
 
     const setUploadHint = (msg) => {
         if (!uploadHint) return;
@@ -248,6 +256,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (["blur", "focus", "visibility", "paste", "copy"].includes(eventType)) {
             return eventTracking;
         }
+        if (eventType === "heartbeat") {
+            return shouldHeartbeat;
+        }
         if (eventType === "arrhythmic_typing") {
             return arrhythmicTracking;
         }
@@ -284,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             await fetch("/viva/log/", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", ...jsHeaders },
                 credentials: "same-origin",
                 keepalive: useKeepalive,
                 body: JSON.stringify({
@@ -299,6 +310,89 @@ document.addEventListener("DOMContentLoaded", () => {
         if (logQueue.length) {
             logTimer = setTimeout(flushLogs, 1000);
         }
+    };
+
+    const isVivaInputTarget = (target) => {
+        if (!target) return false;
+        if (target === vivaInput) return true;
+        return !!target.closest?.("[data-viva-input]");
+    };
+
+    const handleCopy = () => {
+        if (!eventTracking) return;
+        const selection = window.getSelection?.();
+        const text = selection?.toString() || "";
+        if (!text) return;
+        const anchor = selection?.anchorNode;
+        const focus = selection?.focusNode;
+        const isWithinAiBubble = (node) => {
+            if (!node) return false;
+            const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+            if (!el) return false;
+            return !!el.closest(".bubble.ai");
+        };
+        if (!isWithinAiBubble(anchor) && !isWithinAiBubble(focus)) return;
+        queueLog("copy", { length: text.length, source: "ai" });
+    };
+
+    const handlePaste = (e) => {
+        if (!eventTracking) return;
+        if (!isVivaInputTarget(e.target)) return;
+        const text = e.clipboardData?.getData("text") || "";
+        queueLog("paste", { length: text.length });
+    };
+
+    const handleCut = (e) => {
+        if (!eventTracking) return;
+        if (!isVivaInputTarget(e.target)) return;
+        queueLog("cut");
+    };
+
+    const attachClipboardListeners = () => {
+        safeAddEventListener.call(document, "copy", handleCopy, true);
+        safeAddEventListener.call(document, "paste", handlePaste, true);
+        safeAddEventListener.call(document, "cut", handleCut, true);
+    };
+
+    const startClipboardRebind = () => {
+        if (!eventTracking) return;
+        if (clipboardRebindTimer) return;
+        attachClipboardListeners();
+        clipboardRebindTimer = setInterval(attachClipboardListeners, clipboardRebindMs);
+    };
+
+    const sendHeartbeat = async () => {
+        if (!shouldHeartbeat || !vivaSessionActive || !vivaSessionId) return;
+        queueLog("heartbeat");
+        try {
+            const res = await fetch("/viva/ping/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...jsHeaders },
+                credentials: "same-origin",
+                body: JSON.stringify({
+                    session_id: vivaSessionId,
+                    nonce: heartbeatNonce || null,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok && data?.next_nonce) {
+                heartbeatNonce = data.next_nonce;
+            }
+        } catch (err) {
+            // Best-effort only
+        }
+    };
+
+    const startHeartbeat = () => {
+        if (!shouldHeartbeat || heartbeatTimer) return;
+        heartbeatTimer = setInterval(sendHeartbeat, heartbeatIntervalMs);
+        sendHeartbeat();
+    };
+
+    const stopHeartbeat = () => {
+        if (!heartbeatTimer) return;
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
     };
 
     syncInstructorIncludes();
@@ -634,7 +728,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const addVivaBubble = (sender, text, options = {}) => {
-        if (!vivaChatWindow) return;
+        if (!vivaChatWindow) return null;
         const bubble = document.createElement("div");
         bubble.className = `bubble ${sender}`;
         const content = document.createElement("div");
@@ -660,6 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         vivaChatWindow.appendChild(bubble);
         scrollVivaChat();
+        return bubble;
     };
 
     const showVivaThinking = () => {
@@ -792,6 +887,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    ...jsHeaders,
                 },
                 credentials: "same-origin",
                 body: JSON.stringify(payload),
@@ -826,6 +922,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: {
                     "Accept": "application/json",
                     "Content-Type": "application/json",
+                    ...jsHeaders,
                 },
                 credentials: "same-origin",
                 body: JSON.stringify(bodyPayload),
@@ -836,6 +933,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 lastSessionId = vivaSessionId;
                 if (typeof data.attempts_left === "number") attemptsLeft = data.attempts_left;
                 if (typeof data.attempts_used === "number") attemptsUsed = data.attempts_used;
+                if (data.heartbeat_nonce) heartbeatNonce = data.heartbeat_nonce;
                 if (Array.isArray(data.included_submissions)) {
                     syncInclusionState(data.included_submissions);
                 }
@@ -850,6 +948,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 }
                 updateVivaControls();
+                startHeartbeat();
             }
         } catch (err) {
             console.warn("Failed to start viva session", err);
@@ -867,6 +966,16 @@ document.addEventListener("DOMContentLoaded", () => {
             ts: new Date().toISOString(),
             model_answer: modelAnswer || "",
         });
+    };
+
+    const removeLastHistoryEntry = (sessionId, sender, text) => {
+        const key = String(sessionId);
+        const history = sessionHistories[key];
+        if (!Array.isArray(history) || !history.length) return;
+        const last = history[history.length - 1];
+        if ((last.sender || "").toLowerCase() === sender && last.text === text) {
+            history.pop();
+        }
     };
 
     const toggleSubmissionInclude = (submissionId, included) => {
@@ -947,6 +1056,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Completed a run; allow another attempt
             updateVivaControls();
         }
+        stopHeartbeat();
         return {
             sessionId: closingSessionId,
             feedbackText: response?.feedback_text || "",
@@ -1040,7 +1150,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!text) return;
         const activeId = await ensureSession(startUrlDefault);
         if (!activeId) return;
-        addVivaBubble("user", text);
+        const userBubble = addVivaBubble("user", text);
         addHistoryEntry(activeId, "student", text);
         vivaInput.value = "";
         const thinking = showVivaThinking();
@@ -1050,6 +1160,15 @@ document.addEventListener("DOMContentLoaded", () => {
             console.warn("AI reply error:", response?.error || "Unknown error");
         }
         thinking?.remove();
+        if (response?.status === "error") {
+            userBubble?.remove();
+            removeLastHistoryEntry(activeId, "student", text);
+            addVivaBubble("system", response?.message || "Message too long. Please shorten your response.");
+            vivaInput.value = text;
+            setVivaInputDisabled(false);
+            vivaInput?.focus();
+            return;
+        }
         let reply = response?.ai_text || "";
         const modelAnswer = response?.ai_model_answer || "";
         if (!reply) {
@@ -1109,6 +1228,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const showHistory = (sessionId) => {
         viewingHistory = true;
         vivaSessionActive = false;
+        stopHeartbeat();
         activeHistorySessionId = sessionId;
         showModelAnswers = false;
         if (chatCard) chatCard.classList.add("is-history");
@@ -1166,6 +1286,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             startVivaTimer();
         }
+        startHeartbeat();
         showChat(false);
         updateVivaControls();
     };
@@ -1194,11 +1315,6 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             handleVivaSend();
         }
-    });
-    vivaInput?.addEventListener("paste", (e) => {
-        if (!eventTracking) return;
-        const text = e.clipboardData?.getData("text") || "";
-        queueLog("paste", { length: text.length });
     });
     if (vivaInput && arrhythmicTracking) {
         let lastKeyTs = null;
@@ -1267,6 +1383,7 @@ document.addEventListener("DOMContentLoaded", () => {
         viewingHistory = false;
         activeHistorySessionId = null;
         showModelAnswers = false;
+        stopHeartbeat();
         chatCard.classList.remove("is-history");
         setHistoryFeedbackVisible(false);
         if (modelToggleBtn) {
@@ -1430,21 +1547,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.addEventListener("visibilitychange", () => {
             queueLog("visibility", { state: document.visibilityState });
         });
-        const isWithinAiBubble = (node) => {
-            if (!node) return false;
-            const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-            if (!el) return false;
-            return !!el.closest(".bubble.ai");
-        };
-        document.addEventListener("copy", () => {
-            const selection = window.getSelection?.();
-            const text = selection?.toString() || "";
-            if (!text) return;
-            const anchor = selection?.anchorNode;
-            const focus = selection?.focusNode;
-            if (!isWithinAiBubble(anchor) && !isWithinAiBubble(focus)) return;
-            queueLog("copy", { length: text.length, source: "ai" });
-        });
+        startClipboardRebind();
     }
     window.addEventListener("beforeunload", () => {
         flushLogs(true);

@@ -6,7 +6,42 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .helpers import is_instructor_role, is_admin_role
 from ..models import Assignment, Submission, VivaSession, AssignmentResource, AssignmentResourcePreference
-from ..utils import extract_text_from_file
+from ..utils import extract_text_from_file, is_allowed_upload, MAX_SUBMISSION_TEXT_CHARS, ALLOWED_UPLOAD_EXTENSIONS
+
+
+def _reject_upload(request, message):
+    if request.headers.get("accept") == "application/json":
+        return JsonResponse({"status": "error", "message": message}, status=400)
+    return HttpResponseBadRequest(message)
+
+
+def _allowed_ext_label():
+    return ", ".join(sorted(ext.lstrip(".").upper() for ext in ALLOWED_UPLOAD_EXTENSIONS))
+
+
+def _cleanup_submissions(submissions):
+    for sub in submissions:
+        if sub.file:
+            sub.file.delete(save=False)
+        sub.delete()
+
+
+def _cleanup_resources(resources):
+    for resource in resources:
+        if resource.file:
+            resource.file.delete(save=False)
+        resource.delete()
+
+
+def _is_extracted_text_empty(extracted):
+    if not extracted:
+        return True
+    stripped = extracted.strip()
+    if not stripped:
+        return True
+    if stripped.startswith("[Extraction Error"):
+        return True
+    return False
 
 
 # ============================================================
@@ -25,10 +60,14 @@ def submit_text(request):
 
     assignment = Assignment.objects.get(slug=resource_link_id)
 
+    text = (request.POST.get("text") or "").strip()
+    if len(text) > MAX_SUBMISSION_TEXT_CHARS:
+        return HttpResponseBadRequest(f"Text submission too long (max {MAX_SUBMISSION_TEXT_CHARS} chars).")
+
     Submission.objects.create(
         assignment=assignment,
         user_id=user_id,
-        comment=request.POST.get("text", "").strip(),
+        comment=text,
         file=None,
     )
 
@@ -36,7 +75,7 @@ def submit_text(request):
 
 
 # ============================================================
-# File Upload Submission (PDF / DOCX / TXT)
+# File Upload Submission (PDF / DOCX / TXT / PY)
 # ============================================================
 @csrf_exempt
 def submit_file(request):
@@ -54,6 +93,13 @@ def submit_file(request):
     uploads = request.FILES.getlist("file")
     if not uploads:
         return HttpResponseBadRequest("Missing file")
+
+    invalid_uploads = [f.name for f in uploads if not is_allowed_upload(getattr(f, "name", ""))]
+    if invalid_uploads:
+        return _reject_upload(request, f"Unsupported file type. Allowed: {_allowed_ext_label()}.")
+    empty_uploads = [f.name for f in uploads if getattr(f, "size", 0) <= 0]
+    if empty_uploads:
+        return _reject_upload(request, "Empty files cannot be uploaded.")
 
     existing_submissions = list(Submission.objects.filter(
         assignment=assignment,
@@ -73,6 +119,7 @@ def submit_file(request):
             return JsonResponse({"status": "error", "message": "Total upload size limit is 50MB across all files."}, status=400)
         return redirect("assignment_view")
 
+    created_submissions = []
     for uploaded in uploads:
         sub = Submission.objects.create(
             assignment=assignment,
@@ -80,16 +127,23 @@ def submit_file(request):
             file=uploaded,
             comment="",  # extracted text will be added after save
         )
+        created_submissions.append(sub)
 
-        # Extract text immediately for preview/status
+        extracted = ""
         try:
             if sub.file and sub.file.path:
                 extracted = extract_text_from_file(sub.file.path)
-                sub.comment = extracted[:50000]
-                sub.save()
         except Exception:
-            # If extraction fails, continue without blocking the redirect
-            pass
+            extracted = ""
+        if _is_extracted_text_empty(extracted):
+            _cleanup_submissions(created_submissions)
+            return _reject_upload(
+                request,
+                "No extractable text found. If this is a scanned PDF, upload a text-based version.",
+            )
+
+        sub.comment = extracted[:MAX_SUBMISSION_TEXT_CHARS]
+        sub.save(update_fields=["comment"])
 
     return redirect("assignment_view")
 
@@ -108,7 +162,7 @@ def submission_status(request, submission_id):
     # Perform extraction only if comment is empty and file exists
     if sub.file and not sub.comment:
         extracted = extract_text_from_file(sub.file.path)
-        sub.comment = extracted[:50000]  # safety cap
+        sub.comment = extracted[:MAX_SUBMISSION_TEXT_CHARS]  # safety cap
         sub.save()
 
     return render(request, "tool/submission_status.html", {
@@ -163,6 +217,13 @@ def upload_assignment_resource(request):
     if not uploads:
         return HttpResponseBadRequest("Missing file")
 
+    invalid_uploads = [f.name for f in uploads if not is_allowed_upload(getattr(f, "name", ""))]
+    if invalid_uploads:
+        return JsonResponse({"status": "error", "message": f"Unsupported file type. Allowed: {_allowed_ext_label()}."}, status=400)
+    empty_uploads = [f.name for f in uploads if getattr(f, "size", 0) <= 0]
+    if empty_uploads:
+        return JsonResponse({"status": "error", "message": "Empty files cannot be uploaded."}, status=400)
+
     existing_resources = list(AssignmentResource.objects.filter(assignment=assignment))
     if len(existing_resources) + len(uploads) > 10:
         return JsonResponse({"status": "error", "message": "You can upload up to 10 files in total."}, status=400)
@@ -174,6 +235,7 @@ def upload_assignment_resource(request):
         return JsonResponse({"status": "error", "message": "Total upload size limit is 50MB across all files."}, status=400)
 
     created = []
+    created_resources = []
     for uploaded in uploads:
         resource = AssignmentResource.objects.create(
             assignment=assignment,
@@ -181,13 +243,23 @@ def upload_assignment_resource(request):
             comment="",
             included=True,
         )
+        created_resources.append(resource)
+
+        extracted = ""
         try:
             if resource.file and resource.file.path:
                 extracted = extract_text_from_file(resource.file.path)
-                resource.comment = extracted[:50000]
-                resource.save(update_fields=["comment"])
         except Exception:
-            pass
+            extracted = ""
+        if _is_extracted_text_empty(extracted):
+            _cleanup_resources(created_resources)
+            return JsonResponse({
+                "status": "error",
+                "message": "No extractable text found. If this is a scanned PDF, upload a text-based version.",
+            }, status=400)
+
+        resource.comment = extracted[:MAX_SUBMISSION_TEXT_CHARS]
+        resource.save(update_fields=["comment"])
         created.append({
             "id": resource.id,
             "file_name": resource.file.name if resource.file else "Uploaded file",

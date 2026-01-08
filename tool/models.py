@@ -131,6 +131,11 @@ class VivaSession(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     duration_seconds = models.IntegerField(null=True, blank=True)  # optional
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    last_log_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_nonce = models.CharField(max_length=64, blank=True)
+    tamper_suspected = models.BooleanField(default=False)
+    tamper_reason = models.TextField(blank=True)
     feedback_text = models.TextField(blank=True)
     teacher_feedback_text = models.TextField(blank=True)
     teacher_feedback_author = models.ForeignKey(

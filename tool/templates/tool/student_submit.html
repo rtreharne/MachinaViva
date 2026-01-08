@@ -52,6 +52,7 @@
      data-event-tracking="{% if assignment.event_tracking %}true{% else %}false{% endif %}"
      data-keystroke-tracking="{% if assignment.keystroke_tracking %}true{% else %}false{% endif %}"
      data-arrhythmic-typing="{% if assignment.arrhythmic_typing %}true{% else %}false{% endif %}"
+     data-heartbeat-nonce="{{ heartbeat_nonce|default:'' }}"
      data-model-answers-enabled="{% if assignment.enable_model_answers %}true{% else %}false{% endif %}"
      data-instructor-toggle-enabled="{% if assignment.allow_student_resource_toggle %}true{% else %}false{% endif %}"
      data-allow-early-submit="{% if assignment.allow_early_submission %}true{% else %}false{% endif %}"
@@ -95,6 +96,11 @@
             {% endif %}
         </div>
     </header>
+    <noscript>
+        <div class="noscript-warning">
+            JavaScript is required to run the viva. Please enable JavaScript and reload this page.
+        </div>
+    </noscript>
 
     <section class="section dash-compact">
         <div class="standalone-header">
@@ -312,7 +318,7 @@
                         <label>Upload files</label>
                         <form action="{% url 'submit_file' %}" method="POST" enctype="multipart/form-data" class="submission-form upload-inline" data-upload-form data-existing-count="{{ submission_payloads|length|default:0 }}" data-existing-size="{{ submissions_total_size|default:0 }}">
                             {% csrf_token %}
-                            <input type="file" id="file" name="file" accept=".pdf,.docx,.txt" multiple required>
+                            <input type="file" id="file" name="file" accept=".pdf,.docx,.txt,.py" multiple required>
                             <button type="submit" class="control-btn">Upload</button>
                         </form>
                         <div class="meta upload-hint is-hidden" data-upload-hint></div>

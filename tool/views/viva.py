@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import secrets
+from datetime import timedelta
 
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
@@ -62,11 +64,15 @@ FALLBACK_FEEDBACK = (
     "A future attempt with direct, content-based answers would allow a fair evaluation."
 )
 
-MAX_CONTEXT_CHARS = 12000
-MAX_FILE_CHARS = 4000
+MAX_CONTEXT_CHARS = 450000
+MAX_FILE_CHARS = 150000
 MAX_HISTORY_MESSAGES = 20
+MAX_VIVA_MESSAGE_CHARS = 2000
 FALLBACK_AI_REPLY = "Thanks. Could you clarify that point a little more?"
 FALLBACK_MODEL_ANSWER = "The submission does not provide enough detail to answer this directly, but a reasonable response would restate the relevant claim and support it with evidence from the work."
+HEARTBEAT_GRACE_SECONDS = 20
+HEARTBEAT_STALE_SECONDS = 25
+LOG_STALE_SECONDS = 30
 
 
 def _format_feedback_author(user):
@@ -77,6 +83,19 @@ def _format_feedback_author(user):
     if first or last:
         return f"{first} {last}".strip()
     return user.email or user.username or ""
+
+
+def _new_heartbeat_nonce():
+    return secrets.token_urlsafe(16)
+
+
+def _mark_tamper(session, reason):
+    session.tamper_suspected = True
+    reasons = [r.strip() for r in (session.tamper_reason or "").split(";") if r.strip()]
+    if reason not in reasons:
+        reasons.append(reason)
+    session.tamper_reason = "; ".join(reasons)
+    session.save(update_fields=["tamper_suspected", "tamper_reason"])
 
 
 def parse_viva_payload(raw_text):
@@ -328,6 +347,9 @@ def viva_start(request, submission_id):
     if request.method != "POST":
         return HttpResponseBadRequest("POST required")
 
+    if request.headers.get("x-mv-js") != "1":
+        return HttpResponseBadRequest("JavaScript required")
+
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -397,6 +419,9 @@ def viva_start(request, submission_id):
             ended_at=None,
             duration_seconds=None,
         )
+    if not session.heartbeat_nonce:
+        session.heartbeat_nonce = _new_heartbeat_nonce()
+        session.save(update_fields=["heartbeat_nonce"])
 
     # Ensure submission links exist and apply inclusion choices
     bulk_links = []
@@ -454,6 +479,7 @@ def viva_start(request, submission_id):
             "attempts_used": attempt_count,
             "included_submissions": included_payload,
             "included_resources": included_resource_payload,
+            "heartbeat_nonce": session.heartbeat_nonce,
         })
 
     return redirect("viva_session", session_id=session.id)
@@ -502,6 +528,13 @@ def viva_send_message(request):
 
     if request.session.get("lti_user_id") and str(request.session.get("lti_user_id")) != str(session.submission.user_id):
         return HttpResponseBadRequest("Forbidden")
+
+    if text and (sender or "").lower() == "student" and not ended:
+        if len(text) > MAX_VIVA_MESSAGE_CHARS:
+            return JsonResponse({
+                "status": "error",
+                "message": f"Message too long (max {MAX_VIVA_MESSAGE_CHARS} characters). Please shorten your response.",
+            }, status=400)
 
     msg = None
     if text:
@@ -741,6 +774,58 @@ def viva_toggle_resource(request):
 
 
 @csrf_exempt
+def viva_ping(request):
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST required")
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        payload = request.POST
+
+    session_id = payload.get("session_id")
+    nonce = payload.get("nonce")
+    if not session_id:
+        return HttpResponseBadRequest("Missing session ID")
+
+    try:
+        session = VivaSession.objects.select_related("submission__assignment").get(id=session_id)
+    except VivaSession.DoesNotExist:
+        return HttpResponseBadRequest("Invalid session ID")
+
+    if request.session.get("lti_user_id") and str(request.session.get("lti_user_id")) != str(session.submission.user_id):
+        return HttpResponseBadRequest("Forbidden")
+
+    if session.ended_at:
+        return JsonResponse({"status": "ended"})
+
+    if not session.heartbeat_nonce:
+        session.heartbeat_nonce = _new_heartbeat_nonce()
+
+    now_ts = now()
+    update_fields = []
+    if nonce and nonce != session.heartbeat_nonce:
+        _mark_tamper(session, "heartbeat_nonce_mismatch")
+    else:
+        session.last_heartbeat_at = now_ts
+        update_fields.append("last_heartbeat_at")
+        session.heartbeat_nonce = _new_heartbeat_nonce()
+        update_fields.append("heartbeat_nonce")
+
+    if update_fields:
+        session.save(update_fields=update_fields)
+
+    assignment = session.submission.assignment
+    tracking_enabled = assignment.event_tracking or assignment.keystroke_tracking or assignment.arrhythmic_typing
+    grace_deadline = session.started_at + timedelta(seconds=HEARTBEAT_GRACE_SECONDS)
+    if tracking_enabled and now_ts >= grace_deadline:
+        if not session.last_log_at or (now_ts - session.last_log_at).total_seconds() > LOG_STALE_SECONDS:
+            _mark_tamper(session, "log_endpoint_blocked")
+
+    return JsonResponse({"status": "ok", "next_nonce": session.heartbeat_nonce})
+
+
+@csrf_exempt
 def viva_log_event(request):
     if request.method != "POST":
         return HttpResponseBadRequest("POST required")
@@ -767,12 +852,15 @@ def viva_log_event(request):
 
     assignment = session.submission.assignment
     allowed = set()
+    tracking_enabled = assignment.event_tracking or assignment.keystroke_tracking or assignment.arrhythmic_typing
     if assignment.event_tracking:
         allowed.update({"blur", "focus", "visibility", "paste", "copy"})
     if assignment.keystroke_tracking:
         allowed.update({"typing_cadence"})
     if assignment.arrhythmic_typing:
         allowed.update({"arrhythmic_typing"})
+    if tracking_enabled:
+        allowed.add("heartbeat")
 
     events = payload.get("events")
     if not isinstance(events, list):
@@ -812,6 +900,8 @@ def viva_log_event(request):
 
     if logs:
         InteractionLog.objects.bulk_create(logs)
+        session.last_log_at = now()
+        session.save(update_fields=["last_log_at"])
 
     return JsonResponse({"status": "ok", "logged": len(logs)})
 
@@ -854,6 +944,8 @@ def compute_integrity_flags(session):
 
     assignment = session.submission.assignment
     flags = []
+    tracking_enabled = assignment.event_tracking or assignment.keystroke_tracking or assignment.arrhythmic_typing
+    now_ts = now()
 
     blur_count = logs.filter(event_type="blur").count()
     paste_logs = logs.filter(event_type="paste")
@@ -892,5 +984,17 @@ def compute_integrity_flags(session):
         anomaly_logs = logs.filter(event_type="arrhythmic_typing").count()
         if anomaly_logs >= 8:
             flags.append(f"Arrhythmic typing anomalies ({anomaly_logs}×).")
+
+    if tracking_enabled:
+        if session.tamper_suspected:
+            flags.append("Potential tampering detected (client logging disrupted).")
+        else:
+            if session.last_heartbeat_at and (now_ts - session.last_heartbeat_at).total_seconds() > HEARTBEAT_STALE_SECONDS:
+                flags.append("Heartbeat missing or delayed during session.")
+            if session.ended_at:
+                if not session.last_heartbeat_at:
+                    flags.append("No heartbeat received from client.")
+                if not session.last_log_at:
+                    flags.append("No event logs received from client.")
 
     return flags

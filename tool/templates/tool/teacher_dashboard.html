@@ -200,7 +200,7 @@
                                             {% endif %}
                                         {% endif %}
                                     </div>
-                                    <div class="flag {% if student.flags %}warn{% else %}none{% endif %}" data-label="Integrity flags">
+                                    <div class="flag {% if student.flags %}{% if student.tamper_suspected %}danger{% else %}warn{% endif %}{% else %}none{% endif %}" data-label="Integrity flags">
                                         {% if student.flags %}
                                             <details class="flag-details">
                                                 <summary>{{ student.flags|length }} flag{% if student.flags|length != 1 %}s{% endif %}</summary>
@@ -520,7 +520,7 @@
                              data-upload-url="{% url 'upload_assignment_resource' %}"
                              data-existing-count="{{ assignment_resources|length|default:0 }}"
                              data-existing-size="{{ resources_total_size|default:0 }}">
-                            <input type="file" name="file" accept=".pdf,.docx,.txt" multiple data-resource-upload-input>
+                            <input type="file" name="file" accept=".pdf,.docx,.txt,.py" multiple data-resource-upload-input>
                             <button type="button" class="control-btn" data-resource-upload-btn>Upload</button>
                         </div>
                         <div class="meta upload-hint is-hidden" data-resource-upload-hint></div>

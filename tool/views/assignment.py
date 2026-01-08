@@ -590,6 +590,7 @@ def assignment_view(request):
             session = active_session or latest_session
 
             flags = compute_integrity_flags(latest_session) if latest_session else []
+            tamper_suspected = bool(latest_session.tamper_suspected) if latest_session else False
 
             viva_attempts = []
             if sessions_qs.exists():
@@ -708,6 +709,7 @@ def assignment_view(request):
                 "remaining_seconds": remaining,
                 "submitted_at": submitted_at,
                 "flags": flags,
+                "tamper_suspected": tamper_suspected,
                 "viva": viva_payload,
                 "vivas": viva_attempts,
             }
@@ -746,6 +748,7 @@ def assignment_view(request):
                     "remaining_seconds": None,
                     "submitted_at": None,
                     "flags": [],
+                    "tamper_suspected": False,
                     "viva": None,
                     "vivas": [],
                     "is_invite": True,
@@ -881,6 +884,13 @@ def assignment_view(request):
             teacher_feedback_author = ""
     elif latest:
         status = "submitted"
+
+    heartbeat_nonce = ""
+    if active_session:
+        if not active_session.heartbeat_nonce:
+            active_session.heartbeat_nonce = secrets.token_urlsafe(16)
+            active_session.save(update_fields=["heartbeat_nonce"])
+        heartbeat_nonce = active_session.heartbeat_nonce
 
     resource_payloads = []
     resource_include_map = {}
@@ -1079,4 +1089,5 @@ def assignment_view(request):
         "config_files_included": True if config_files else False,
         "assignment_resources": resource_payloads,
         "submissions_total_size": submissions_total_size,
+        "heartbeat_nonce": heartbeat_nonce,
     })
