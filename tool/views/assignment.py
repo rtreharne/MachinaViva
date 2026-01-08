@@ -591,6 +591,7 @@ def assignment_view(request):
 
             flags = compute_integrity_flags(latest_session) if latest_session else []
             tamper_suspected = bool(latest_session.tamper_suspected) if latest_session else False
+            knowledge_flag = session.knowledge_flag if session else ""
 
             viva_attempts = []
             if sessions_qs.exists():
@@ -677,6 +678,7 @@ def assignment_view(request):
                         "messages": messages,
                         "feedback": feedback,
                         "flags": compute_integrity_flags(sess),
+                        "knowledge_flag": sess.knowledge_flag or "",
                         "created_at": sess.started_at.isoformat(),
                         "status": "completed" if sess.ended_at else "in_progress",
                         "files": files + resource_files,
@@ -710,6 +712,7 @@ def assignment_view(request):
                 "submitted_at": submitted_at,
                 "flags": flags,
                 "tamper_suspected": tamper_suspected,
+                "knowledge_flag": knowledge_flag,
                 "viva": viva_payload,
                 "vivas": viva_attempts,
             }
@@ -749,6 +752,7 @@ def assignment_view(request):
                     "submitted_at": None,
                     "flags": [],
                     "tamper_suspected": False,
+                    "knowledge_flag": "",
                     "viva": None,
                     "vivas": [],
                     "is_invite": True,

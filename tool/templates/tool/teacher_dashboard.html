@@ -146,7 +146,7 @@
             <div class="carousel">
                 <div class="carousel-pane active" data-dash-pane="table">
                     <div class="table-card">
-                        <div class="table-head">
+                        <div class="table-head cols-4">
                             <div>Student</div>
                             <div>
                                 <button class="table-filter" type="button" data-filter="viva" aria-pressed="false">
@@ -154,6 +154,7 @@
                                     <span class="filter-indicator is-hidden" data-filter-indicator="viva"></span>
                                 </button>
                             </div>
+                            <div>Alignment</div>
                             <div>
                                 <button class="table-filter" type="button" data-filter="flags" aria-pressed="false">
                                     Integrity flags
@@ -164,7 +165,7 @@
 
                         {% if students %}
                             {% for student in students %}
-                                <div class="table-row"
+                                <div class="table-row cols-4"
                                      data-student-row
                                      data-student-id="{{ student.user_id }}"
                                      data-student-search="{{ student.name|lower }} {{ student.email|default:''|lower }}"
@@ -200,6 +201,26 @@
                                             {% endif %}
                                         {% endif %}
                                     </div>
+                                    <div class="flag alignment-flag" data-label="Alignment">
+                                        {% if student.knowledge_flag %}
+                                            <details class="flag-details">
+                                                <summary>{{ student.knowledge_flag }}</summary>
+                                                <ul>
+                                                    {% if student.knowledge_flag == "Aligned" %}
+                                                        <li>Responses consistently demonstrate knowledge that matches the key ideas in the submitted files.</li>
+                                                    {% elif student.knowledge_flag == "Partially aligned" %}
+                                                        <li>Responses show some knowledge that matches the submitted files, but other key ideas are missing, unclear, or inconsistent.</li>
+                                                    {% elif student.knowledge_flag == "Needs clarification" %}
+                                                        <li>Responses relate to the submitted files but are too vague or incomplete to judge how well they demonstrate knowledge.</li>
+                                                    {% else %}
+                                                        <li>Responses do not provide enough evidence to judge alignment with the submitted files.</li>
+                                                    {% endif %}
+                                                </ul>
+                                            </details>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </div>
                                     <div class="flag {% if student.flags %}{% if student.tamper_suspected %}danger{% else %}warn{% endif %}{% else %}none{% endif %}" data-label="Integrity flags">
                                         {% if student.flags %}
                                             <details class="flag-details">
@@ -217,9 +238,10 @@
                                 </div>
                             {% endfor %}
                         {% else %}
-                            <div class="table-row">
+                            <div class="table-row cols-4">
                                 <div>No roster available</div>
                                 <div class="viva-cell"><span class="viva-status no"></span><span class="link disabled">—</span></div>
+                                <div class="flag alignment-flag">—</div>
                                 <div class="flag none">—</div>
                             </div>
                         {% endif %}
@@ -275,6 +297,24 @@
                                     <div class="settings-actions">
                                         <button class="control-btn" type="submit">Save feedback</button>
                                         <span class="meta status-line" data-teacher-feedback-status></span>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="side-card">
+                                <p class="tiny">Alignment</p>
+                                <form class="feedback-form" data-knowledge-flag-form>
+                                    <div class="settings-row">
+                                        <select data-knowledge-flag-input>
+                                            <option value="" selected>Not set</option>
+                                            <option value="Aligned">Aligned</option>
+                                            <option value="Partially aligned">Partially aligned</option>
+                                            <option value="Needs clarification">Needs clarification</option>
+                                            <option value="Unclear">Unclear</option>
+                                        </select>
+                                    </div>
+                                    <div class="settings-actions">
+                                        <button class="control-btn" type="submit">Save flag</button>
+                                        <span class="meta status-line" data-knowledge-flag-status></span>
                                     </div>
                                 </form>
                             </div>

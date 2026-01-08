@@ -29,6 +29,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const teacherFeedbackInput = document.querySelector("[data-teacher-feedback-input]");
     const teacherFeedbackAuthorEl = document.querySelector("[data-teacher-feedback-author]");
     const teacherFeedbackStatus = document.querySelector("[data-teacher-feedback-status]");
+    const knowledgeFlagForm = document.querySelector("[data-knowledge-flag-form]");
+    const knowledgeFlagInput = document.querySelector("[data-knowledge-flag-input]");
+    const knowledgeFlagStatus = document.querySelector("[data-knowledge-flag-status]");
     const previewModal = document.querySelector("[data-preview-modal]");
     const previewContent = document.querySelector("[data-preview-content]");
     const previewClose = document.querySelector("[data-preview-close]");
@@ -60,6 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const toast = document.querySelector("[data-save-toast]");
     let activeStudent = null;
     let activeFeedbackSessionId = null;
+    let activeKnowledgeFlagSessionId = null;
     if (attemptSelect) attemptSelect.disabled = true;
 
     const showPane = (target) => {
@@ -661,6 +665,16 @@ document.addEventListener("DOMContentLoaded", () => {
             renderMessages([]);
             renderFlags([]);
             renderFeedback(null, null);
+            if (knowledgeFlagInput) {
+                knowledgeFlagInput.value = "";
+                knowledgeFlagInput.disabled = true;
+            }
+            if (knowledgeFlagForm) {
+                const saveBtn = knowledgeFlagForm.querySelector("button[type='submit']");
+                if (saveBtn) saveBtn.disabled = true;
+            }
+            if (knowledgeFlagStatus) knowledgeFlagStatus.textContent = "";
+            activeKnowledgeFlagSessionId = null;
             if (transcriptDuration) transcriptDuration.textContent = "Duration: —";
             if (transcriptStatus) transcriptStatus.textContent = "Pending";
             return;
@@ -675,6 +689,16 @@ document.addEventListener("DOMContentLoaded", () => {
         renderFlags(attempt.flags || []);
         renderFeedback(attempt.feedback, attempt.session_id);
         renderFiles(attempt.files || []);
+        activeKnowledgeFlagSessionId = attempt.session_id || null;
+        if (knowledgeFlagInput) {
+            knowledgeFlagInput.value = attempt.knowledge_flag || "";
+            knowledgeFlagInput.disabled = !activeKnowledgeFlagSessionId;
+        }
+        if (knowledgeFlagForm) {
+            const saveBtn = knowledgeFlagForm.querySelector("button[type='submit']");
+            if (saveBtn) saveBtn.disabled = !activeKnowledgeFlagSessionId;
+        }
+        if (knowledgeFlagStatus) knowledgeFlagStatus.textContent = "";
 
         if (transcriptDuration) {
             transcriptDuration.textContent = formatDuration(attempt.duration_seconds);
@@ -703,6 +727,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const formatStatusLabel = (status) => {
         if (!status) return "";
         return statusLabels[status] || status.replace(/_/g, " ");
+    };
+
+    const updateRosterKnowledgeFlag = (studentId, value) => {
+        const descriptions = {
+            "Aligned": "Responses consistently demonstrate knowledge that matches the key ideas in the submitted files.",
+            "Partially aligned": "Responses show some knowledge that matches the submitted files, but other key ideas are missing, unclear, or inconsistent.",
+            "Needs clarification": "Responses relate to the submitted files but are too vague or incomplete to judge how well they demonstrate knowledge.",
+            "Unclear": "Responses do not provide enough evidence to judge alignment with the submitted files.",
+        };
+        getRowEls().forEach((row) => {
+            if (String(row.dataset.studentId) !== String(studentId)) return;
+            const cell = row.querySelector(".alignment-flag");
+            if (!cell) return;
+            if (!value) {
+                cell.textContent = "—";
+                return;
+            }
+            const desc = descriptions[value] || "Responses do not provide enough evidence to judge alignment with the submitted files.";
+            cell.innerHTML = `
+                <details class="flag-details">
+                    <summary>${value}</summary>
+                    <ul><li>${desc}</li></ul>
+                </details>
+            `.trim();
+        });
     };
 
     const formatFlags = (flags) => {
@@ -734,6 +783,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "Student email",
             "Student id",
             "Viva status",
+            "Alignment",
             "Invite status",
             "Integrity flags",
             "Attempt number",
@@ -750,6 +800,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 student?.email || "",
                 student?.user_id || "",
                 formatStatusLabel(student?.status),
+                student?.knowledge_flag || "",
                 student?.invite_status || "",
                 formatFlags(student?.flags),
             ];
@@ -1303,6 +1354,50 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             } catch (err) {
                 setStatus(teacherFeedbackStatus, "Unable to save right now.", "error");
+            }
+        });
+    }
+
+    if (knowledgeFlagForm && knowledgeFlagInput) {
+        knowledgeFlagForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!activeKnowledgeFlagSessionId) {
+                setStatus(knowledgeFlagStatus, "Select a completed attempt first.", "error");
+                return;
+            }
+            const csrf = getCookie("csrftoken");
+            setStatus(knowledgeFlagStatus, "Saving...", "neutral");
+            try {
+                const res = await fetch(`/viva/knowledge-flag/${activeKnowledgeFlagSessionId}/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrf ? { "X-CSRFToken": csrf } : {}),
+                    },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                        knowledge_flag: knowledgeFlagInput.value || "",
+                    }),
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || "Save failed");
+                }
+                const data = await res.json().catch(() => ({}));
+                const newFlag = data.knowledge_flag || "";
+                setStatus(knowledgeFlagStatus, "Saved", "success");
+                if (activeStudent) {
+                    const attempts = getAttempts(activeStudent);
+                    const target = attempts.find((attempt) => String(attempt.session_id) === String(activeKnowledgeFlagSessionId));
+                    if (target) target.knowledge_flag = newFlag;
+                    const latest = attempts[0];
+                    if (latest && String(latest.session_id) === String(activeKnowledgeFlagSessionId)) {
+                        activeStudent.knowledge_flag = newFlag;
+                        updateRosterKnowledgeFlag(activeStudent.user_id, newFlag);
+                    }
+                }
+            } catch (err) {
+                setStatus(knowledgeFlagStatus, "Unable to save right now.", "error");
             }
         });
     }

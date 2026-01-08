@@ -1,0 +1,81 @@
+{% load static %}
+{% now "U" as cachebust %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MachinaViva articles and updates.">
+    <title>MachinaViva | Articles</title>
+    <link rel="stylesheet" href="{% static 'tool/home.css' %}?v={{ cachebust }}">
+    <script defer src="{% static 'tool/nav.js' %}?v={{ cachebust }}"></script>
+</head>
+<body>
+<div class="page">
+    <header class="nav nav-landing">
+        <a class="brand" href="/" aria-label="MachinaViva home">
+            <span class="brand-mark">MV</span>
+            <span>MachinaViva</span>
+        </a>
+        <button class="nav-toggle" data-nav-toggle aria-label="Toggle navigation">Menu</button>
+        <nav class="nav-links" data-nav-links>
+            <a href="/">Home</a>
+            <a class="is-active" href="{% url 'blog_list' %}">Articles</a>
+            <a href="/app/login" class="pill">Login</a>
+        </nav>
+    </header>
+
+    <section class="section blog-hero">
+        <div class="section-head">
+            <p class="eyebrow">MachinaViva Journal</p>
+            <h1>Articles, interviews, and assessment notes.</h1>
+            <p class="lede">Thoughtful takes on authentic assessment, vivas, and designing for understanding in the AI era.</p>
+        </div>
+    </section>
+
+    <section class="section blog-grid">
+        {% if articles %}
+            <div class="blog-card-grid">
+                {% for article in articles %}
+                    <article class="blog-card{% if article.cover_image %} has-media{% endif %}">
+                        {% if article.cover_image %}
+                            <a class="blog-card-media" href="{% url 'blog_detail' article.slug %}">
+                                <img src="{{ article.cover_image.url }}" alt="{{ article.title }}" style="object-position: {{ article.cover_focus_x }}% {{ article.cover_focus_y }}%;">
+                            </a>
+                        {% endif %}
+                        <div class="blog-card-body">
+                            <div class="blog-meta">
+                                {% if article.published_at %}
+                                    <span>{{ article.published_at|date:"j M Y" }}</span>
+                                {% endif %}
+                                {% if article.author_name %}
+                                    <span>By {{ article.author_name }}</span>
+                                {% endif %}
+                            </div>
+                            <h2 class="blog-card-title">
+                                <a href="{% url 'blog_detail' article.slug %}">{{ article.title }}</a>
+                            </h2>
+                            {% if article.subtitle %}
+                                <p class="blog-card-subtitle">{{ article.subtitle }}</p>
+                            {% endif %}
+                            <p class="blog-card-excerpt">
+                                {% if article.summary %}
+                                    {{ article.summary|striptags|truncatechars:220 }}
+                                {% else %}
+                                    {{ article.body|striptags|truncatechars:220 }}
+                                {% endif %}
+                            </p>
+                            <a class="link" href="{% url 'blog_detail' article.slug %}">Read article</a>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p class="lede">No articles yet. Check back soon.</p>
+            </div>
+        {% endif %}
+    </section>
+</div>
+</body>
+</html>

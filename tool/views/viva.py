@@ -56,6 +56,14 @@ Focus on whether the student engaged with the prompts, showed basic understandin
 Do not mention AI, integrity signals, or the system.
 Do not use bullet points or labels."""
 
+KNOWLEDGE_FLAG_SYSTEM_PROMPT = """You assign an alignment flag for a completed viva.
+Compare student responses to the reference answers provided.
+Return exactly one of: Aligned, Partially aligned, Needs clarification, Unclear.
+Use Unclear when there is not enough evidence in the responses to judge alignment.
+Return only the label with no extra text."""
+
+KNOWLEDGE_FLAG_VALUES = ["Aligned", "Partially aligned", "Needs clarification", "Unclear"]
+
 FALLBACK_FEEDBACK = (
     "Your responses in this viva did not address the questions and were very brief, "
     "so your understanding of the submission could not be assessed. "
@@ -96,6 +104,112 @@ def _mark_tamper(session, reason):
         reasons.append(reason)
     session.tamper_reason = "; ".join(reasons)
     session.save(update_fields=["tamper_suspected", "tamper_reason"])
+
+
+def _normalize_knowledge_flag(value):
+    if not value:
+        return ""
+    cleaned = str(value).strip().lower()
+    for label in KNOWLEDGE_FLAG_VALUES:
+        if cleaned == label.lower() or cleaned.startswith(label.lower()):
+            return label
+    for label in KNOWLEDGE_FLAG_VALUES:
+        if label.lower() in cleaned:
+            return label
+    return ""
+
+
+OFFTOPIC_KEYWORDS = [
+    "chocolate",
+    "cake",
+    "recipe",
+    "make me",
+    "do you like",
+]
+
+NONANSWER_PHRASES = [
+    "i don't know",
+    "i dont know",
+    "idk",
+    "no idea",
+    "not sure",
+    "can't remember",
+    "cant remember",
+    "skip",
+    "pass",
+]
+
+
+def _classify_student_response(text):
+    cleaned = (text or "").strip().lower()
+    if not cleaned:
+        return "empty"
+    if any(phrase in cleaned for phrase in OFFTOPIC_KEYWORDS):
+        return "offtopic"
+    if any(phrase in cleaned for phrase in NONANSWER_PHRASES):
+        return "nonanswer"
+    return "answer"
+
+
+def _analyze_knowledge_flag_blocks(blocks):
+    total_responses = 0
+    substantive_answers = 0
+    off_topic_or_nonanswer = 0
+    unanswered_questions = 0
+    consecutive_unanswered = 0
+    max_consecutive_unanswered = 0
+    for block in blocks:
+        responses = block.get("responses") or []
+        if not responses:
+            unanswered_questions += 1
+            consecutive_unanswered += 1
+            max_consecutive_unanswered = max(max_consecutive_unanswered, consecutive_unanswered)
+            continue
+        consecutive_unanswered = 0
+        block_has_answer = False
+        for response in responses:
+            total_responses += 1
+            classification = _classify_student_response(response)
+            if classification in ("offtopic", "nonanswer"):
+                off_topic_or_nonanswer += 1
+                continue
+            if classification == "answer":
+                block_has_answer = True
+                if _word_count(response) >= 6:
+                    substantive_answers += 1
+        if not block_has_answer:
+            unanswered_questions += 1
+    off_topic_ratio = off_topic_or_nonanswer / total_responses if total_responses else 0
+    return {
+        "total_responses": total_responses,
+        "substantive_answers": substantive_answers,
+        "unanswered_questions": unanswered_questions,
+        "max_consecutive_unanswered": max_consecutive_unanswered,
+        "off_topic_ratio": off_topic_ratio,
+    }
+
+
+def _apply_knowledge_flag_guardrails(model_label, analysis):
+    scores = {
+        "Aligned": 3,
+        "Partially aligned": 2,
+        "Needs clarification": 1,
+        "Unclear": 0,
+    }
+    label = model_label if model_label in scores else "Unclear"
+    if analysis["total_responses"] == 0 or analysis["substantive_answers"] == 0:
+        return "Unclear"
+
+    cap_label = None
+    if analysis["substantive_answers"] < 2:
+        cap_label = "Needs clarification"
+
+    if analysis["off_topic_ratio"] >= 0.35 or analysis["unanswered_questions"] >= 2 or analysis["max_consecutive_unanswered"] >= 2:
+        cap_label = "Partially aligned" if analysis["substantive_answers"] >= 2 else "Needs clarification"
+
+    if cap_label:
+        return cap_label if scores[cap_label] < scores[label] else label
+    return label
 
 
 def parse_viva_payload(raw_text):
@@ -339,6 +453,83 @@ def generate_viva_feedback(session):
     return (response.choices[0].message.content or "").strip()
 
 
+def _build_knowledge_flag_context(session):
+    history = list(VivaMessage.objects.filter(session=session).order_by("timestamp"))
+    if not history:
+        return {"context": "", "blocks": []}
+    qa_blocks = []
+    current = None
+    for msg in history:
+        sender = (msg.sender or "").lower()
+        if sender == "ai":
+            if current:
+                qa_blocks.append(current)
+            current = {
+                "question": (msg.text or "").strip(),
+                "model_answer": (msg.model_answer or "").strip(),
+                "responses": [],
+            }
+        elif current:
+            text = (msg.text or "").strip()
+            if text:
+                current["responses"].append(text)
+    if current:
+        qa_blocks.append(current)
+
+    if not qa_blocks:
+        return {"context": "", "blocks": []}
+
+    lines = []
+    for idx, block in enumerate(qa_blocks, start=1):
+        lines.append(f"Q{idx}: {block['question'] or 'Question missing.'}")
+        if block["model_answer"]:
+            lines.append(f"Reference answer: {block['model_answer']}")
+        responses = " | ".join(block["responses"]) if block["responses"] else "No student response."
+        lines.append(f"Student response: {responses}")
+        lines.append("")
+    return {"context": "\n".join(lines).strip(), "blocks": qa_blocks}
+
+
+def generate_knowledge_flag(session):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing OPENAI_API_KEY")
+
+    assignment = session.submission.assignment
+    submission_context = build_submission_context(session)
+    qa_payload = _build_knowledge_flag_context(session)
+    qa_context = qa_payload.get("context", "")
+    blocks = qa_payload.get("blocks", [])
+    if not qa_context:
+        return "Unclear"
+    analysis = _analyze_knowledge_flag_blocks(blocks)
+
+    assignment_title = assignment.title or "Untitled assignment"
+    assignment_desc = assignment.description or ""
+
+    messages = [
+        {"role": "system", "content": KNOWLEDGE_FLAG_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                f"Assignment: {assignment_title}\n"
+                f"Description: {assignment_desc}\n\n"
+                f"Submission materials:\n{submission_context}\n\n"
+                f"Viva exchanges with reference answers:\n{qa_context}"
+            ),
+        },
+    ]
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=messages,
+        temperature=0.2,
+    )
+    raw = (response.choices[0].message.content or "").strip()
+    model_label = _normalize_knowledge_flag(raw) or "Unclear"
+    return _apply_knowledge_flag_guardrails(model_label, analysis)
+
+
 # ---------------------------------------------------------
 # Start a viva session
 # ---------------------------------------------------------
@@ -577,6 +768,15 @@ def viva_send_message(request):
                 session.feedback_text = feedback_text
                 session.save(update_fields=["feedback_text"])
 
+        if not (session.knowledge_flag or "").strip():
+            try:
+                knowledge_flag = generate_knowledge_flag(session)
+            except Exception:
+                knowledge_flag = ""
+            if knowledge_flag:
+                session.knowledge_flag = knowledge_flag
+                session.save(update_fields=["knowledge_flag"])
+
         assignment = session.submission.assignment
         feedback_visible = bool(assignment.ai_feedback_visible)
 
@@ -660,6 +860,42 @@ def viva_feedback_update(request, session_id):
         "status": "ok",
         "teacher_feedback": teacher_feedback,
         "teacher_feedback_author": _format_feedback_author(session.teacher_feedback_author),
+    })
+
+
+def viva_knowledge_flag_update(request, session_id):
+    roles = request.session.get("lti_roles", [])
+    if not (is_instructor_role(roles) or is_admin_role(roles)):
+        return HttpResponse("Forbidden", status=403)
+
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST required")
+
+    try:
+        session = VivaSession.objects.select_related("submission__assignment").get(id=session_id)
+    except VivaSession.DoesNotExist:
+        return HttpResponseBadRequest("Invalid viva session ID")
+
+    resource_link_id = request.session.get("lti_resource_link_id")
+    if resource_link_id and session.submission.assignment.slug != resource_link_id:
+        return HttpResponse("Forbidden", status=403)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except Exception:
+        payload = request.POST
+
+    raw_flag = (payload.get("knowledge_flag") or "").strip()
+    normalized = _normalize_knowledge_flag(raw_flag)
+    if raw_flag and not normalized:
+        return HttpResponseBadRequest("Invalid knowledge flag value")
+
+    session.knowledge_flag = normalized
+    session.save(update_fields=["knowledge_flag"])
+
+    return JsonResponse({
+        "status": "ok",
+        "knowledge_flag": normalized,
     })
 
 

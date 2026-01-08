@@ -87,6 +87,34 @@ class Assignment(models.Model):
         return self.title
 
 
+class Article(models.Model):
+    title = models.CharField(max_length=255)
+    subtitle = models.CharField(max_length=255, blank=True)
+    slug = models.SlugField(unique=True)
+    summary = models.TextField(blank=True)
+    body = models.TextField()
+    cover_image = models.ImageField(upload_to="article_covers/", blank=True, null=True)
+    cover_focus_x = models.PositiveIntegerField(
+        default=50,
+        help_text="Horizontal focal point (0-100, left to right).",
+    )
+    cover_focus_y = models.PositiveIntegerField(
+        default=50,
+        help_text="Vertical focal point (0-100, top to bottom).",
+    )
+    author_name = models.CharField(max_length=120, blank=True)
+    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-published_at", "-created_at"]
+
+    def __str__(self):
+        return self.title
+
+
 class Submission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE)
     user_id = models.CharField(max_length=255)  # From LTI claim: sub
@@ -146,6 +174,7 @@ class VivaSession(models.Model):
         related_name="viva_teacher_feedback",
     )
     rating = models.IntegerField(null=True, blank=True)
+    knowledge_flag = models.CharField(max_length=32, blank=True)
 
     def __str__(self):
         return f"Viva for {self.submission.user_id} (session {self.id})"

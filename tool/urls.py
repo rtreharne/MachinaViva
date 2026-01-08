@@ -4,6 +4,8 @@ from . import views
 urlpatterns = [
     #path("", views.index),
     path("", views.home, name="landing_home"),
+    path("blog/", views.blog_list, name="blog_list"),
+    path("blog/<slug:slug>/", views.blog_detail, name="blog_detail"),
 
     # Standalone auth + app
     path("app/signup/", views.standalone_signup, name="standalone_signup"),
@@ -69,6 +71,7 @@ urlpatterns = [
     path("viva/session/<int:session_id>/", views.viva_session, name="viva_session"),
     path("viva/send/", views.viva_send_message, name="viva_send_message"),
     path("viva/feedback/<int:session_id>/", views.viva_feedback_update, name="viva_feedback_update"),
+    path("viva/knowledge-flag/<int:session_id>/", views.viva_knowledge_flag_update, name="viva_knowledge_flag_update"),
     path("viva/toggle_submission/", views.viva_toggle_submission, name="viva_toggle_submission"),
     path("viva/toggle_resource/", views.viva_toggle_resource, name="viva_toggle_resource"),
     path("viva/log/", views.viva_log_event, name="viva_log_event"),
