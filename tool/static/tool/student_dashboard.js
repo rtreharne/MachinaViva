@@ -1528,6 +1528,52 @@ document.addEventListener("DOMContentLoaded", () => {
         return !uploadSizeInvalid;
     }
 
+    const submitUploadForm = async (form) => {
+        if (!form) return;
+        const action = form.getAttribute("action");
+        if (!action) return;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const formData = new FormData(form);
+        const hasFile = formData.get("file");
+        if (!hasFile) {
+            setUploadHint("Select at least one file to upload.");
+            return;
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        setUploadHint("");
+        try {
+            const res = await fetch(action, {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    ...jsHeaders,
+                },
+                credentials: "same-origin",
+                body: formData,
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                setUploadHint(data?.message || "Upload failed. Please try again.");
+                return;
+            }
+            if (data?.status === "ok") {
+                window.location.reload();
+                return;
+            }
+            if (res.redirected && res.url) {
+                window.location.href = res.url;
+                return;
+            }
+            window.location.reload();
+        } catch (err) {
+            console.warn("Upload failed", err);
+            setUploadHint("Upload failed. Please try again.");
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            validateUploadSelection();
+        }
+    };
+
     if (uploadInput) {
         uploadInput.addEventListener("change", validateUploadSelection);
     }
@@ -1536,7 +1582,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!validateUploadSelection()) {
                 e.preventDefault();
                 e.stopPropagation();
+                return;
             }
+            e.preventDefault();
+            e.stopPropagation();
+            submitUploadForm(uploadForm);
         });
         validateUploadSelection();
     }

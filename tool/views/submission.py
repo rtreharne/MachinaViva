@@ -56,7 +56,7 @@ def submit_text(request):
     resource_link_id = request.session.get("lti_resource_link_id")
 
     if not user_id or not resource_link_id:
-        return HttpResponseBadRequest("Missing LTI session info")
+        return _reject_upload(request, "Missing LTI session info")
 
     assignment = Assignment.objects.get(slug=resource_link_id)
 
@@ -92,7 +92,7 @@ def submit_file(request):
 
     uploads = request.FILES.getlist("file")
     if not uploads:
-        return HttpResponseBadRequest("Missing file")
+        return _reject_upload(request, "Missing file")
 
     invalid_uploads = [f.name for f in uploads if not is_allowed_upload(getattr(f, "name", ""))]
     if invalid_uploads:
@@ -144,6 +144,9 @@ def submit_file(request):
 
         sub.comment = extracted[:MAX_SUBMISSION_TEXT_CHARS]
         sub.save(update_fields=["comment"])
+
+    if request.headers.get("accept") == "application/json":
+        return JsonResponse({"status": "ok"})
 
     return redirect("assignment_view")
 
