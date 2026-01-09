@@ -194,8 +194,8 @@
                     <textarea id="viva_instructions" name="viva_instructions" rows="4" placeholder="How should the AI conduct the viva? Tone, strictness, what to probe, what to avoid.">{% if edit_mode %}{{ assignment.viva_instructions }}{% endif %}</textarea>
                 </div>
                 <div class="settings-row">
-                    <label for="additional_prompts">Additional prompts</label>
-                    <textarea id="additional_prompts" name="additional_prompts" rows="3" placeholder="Any bespoke prompts or discipline-specific instructions.">{% if edit_mode %}{{ assignment.additional_prompts }}{% endif %}</textarea>
+                    <label for="additional_prompts">Priority questions</label>
+                    <textarea id="additional_prompts" name="additional_prompts" rows="3" placeholder="Questions to prioritise early in the viva. One per line is best.">{% if edit_mode %}{{ assignment.additional_prompts }}{% endif %}</textarea>
                 </div>
                 <div class="settings-row">
                     <label for="instructor_notes">Instructor notes (private)</label>

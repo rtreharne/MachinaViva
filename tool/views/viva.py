@@ -247,6 +247,25 @@ def _word_count(text):
     return len(re.findall(r"[A-Za-z0-9']+", text or ""))
 
 
+def _extract_priority_questions(text):
+    if not text:
+        return []
+    questions = []
+    for raw in str(text).splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        line = re.sub(r"^[-*\u2022\s]+", "", line)
+        line = re.sub(r"^[0-9]+[.)\s]+", "", line).strip()
+        if line:
+            questions.append(line)
+    return questions
+
+
+def _normalize_question(text):
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
 def _use_feedback_fallback(history):
     student_texts = [
         (msg.text or "").strip()
@@ -338,7 +357,11 @@ def build_system_prompt(assignment, submission_context):
         sections.append(f"Core viva instructions (from settings):\n{assignment.viva_instructions.strip()}")
 
     if assignment.additional_prompts:
-        sections.append(f"Additional prompts (from settings):\n{assignment.additional_prompts.strip()}")
+        sections.append(
+            "Priority questions (from settings):\n"
+            "Ask these before other questions, and cover all if time allows.\n"
+            f"{assignment.additional_prompts.strip()}"
+        )
 
     if submission_context:
         sections.append(f"Submission materials:\n{submission_context}")
@@ -387,8 +410,26 @@ def generate_viva_reply(session):
 
     assignment = session.submission.assignment
     submission_context = build_submission_context(session)
-    messages = build_chat_messages(session, assignment, submission_context=submission_context)
     client = OpenAI(api_key=api_key)
+    priority_questions = _extract_priority_questions(assignment.additional_prompts)
+    if priority_questions:
+        asked_ai = [
+            _normalize_question(m.text)
+            for m in VivaMessage.objects.filter(session=session, sender="ai")
+        ]
+        for question in priority_questions:
+            normalized = _normalize_question(question)
+            if any(normalized and normalized in asked for asked in asked_ai):
+                continue
+            try:
+                model_answer = generate_model_answer(client, question, submission_context)
+            except Exception:
+                model_answer = ""
+            if not model_answer:
+                model_answer = FALLBACK_MODEL_ANSWER
+            return question, model_answer
+
+    messages = build_chat_messages(session, assignment, submission_context=submission_context)
     response = client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=messages,
@@ -438,7 +479,7 @@ def generate_viva_feedback(session):
                 f"Assignment: {assignment_title}\n"
                 f"Description: {assignment_desc}\n\n"
                 f"Viva instructions: {viva_instructions or 'None'}\n"
-                f"Additional prompts: {additional_prompts or 'None'}\n\n"
+                f"Priority questions: {additional_prompts or 'None'}\n\n"
                 f"Submission materials:\n{submission_context}\n\n"
                 f"Viva transcript:\n{transcript}"
             ),

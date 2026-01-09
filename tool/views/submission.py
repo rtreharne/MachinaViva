@@ -89,6 +89,8 @@ def submit_file(request):
         return HttpResponseBadRequest("Missing LTI session info")
 
     assignment = Assignment.objects.get(slug=resource_link_id)
+    if not assignment.allow_student_uploads:
+        return _reject_upload(request, "File uploads are disabled for this assignment.")
 
     uploads = request.FILES.getlist("file")
     if not uploads:

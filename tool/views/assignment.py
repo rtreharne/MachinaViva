@@ -3,7 +3,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.urls import reverse
 from django.utils.text import slugify
 from .helpers import is_instructor_role, is_admin_role, fetch_nrps_roster
-from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaSessionSubmission, InteractionLog, AssignmentResource, AssignmentResourcePreference, VivaSessionResource, AssignmentInvitation, AssignmentMembership
+from ..models import Assignment, Submission, VivaMessage, VivaSession, VivaSessionSubmission, InteractionLog, AssignmentResource, AssignmentResourcePreference, VivaSessionResource, AssignmentInvitation, AssignmentMembership, AssignmentSettingsChange
 from datetime import datetime
 from django.utils import timezone
 from django.utils.timezone import now
@@ -29,6 +29,82 @@ def _format_feedback_author(user):
         return f"{first} {last}".strip()
     return user.email or user.username or ""
 
+
+TRACKED_ASSIGNMENT_FIELDS = [
+    "description",
+    "viva_duration_seconds",
+    "max_attempts",
+    "viva_tone",
+    "ai_feedback_visible",
+    "teacher_feedback_visible",
+    "viva_instructions",
+    "additional_prompts",
+    "instructor_notes",
+    "allow_student_report",
+    "allow_early_submission",
+    "deadline_at",
+    "keystroke_tracking",
+    "event_tracking",
+    "arrhythmic_typing",
+    "enable_model_answers",
+    "allow_student_resource_toggle",
+    "allow_student_uploads",
+]
+
+
+def _serialize_setting_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def _collect_assignment_snapshot(assignment):
+    snapshot = {}
+    for field in TRACKED_ASSIGNMENT_FIELDS:
+        snapshot[field] = _serialize_setting_value(getattr(assignment, field))
+    return snapshot
+
+
+SETTING_LABELS = {
+    "description": "Description",
+    "viva_duration_seconds": "Duration (minutes)",
+    "max_attempts": "Attempts",
+    "viva_tone": "Tone",
+    "ai_feedback_visible": "AI feedback visible",
+    "teacher_feedback_visible": "Teacher feedback visible",
+    "viva_instructions": "Viva instructions",
+    "additional_prompts": "Priority questions",
+    "instructor_notes": "Instructor notes",
+    "allow_student_report": "Allow student report",
+    "allow_early_submission": "Allow early submission",
+    "deadline_at": "Deadline",
+    "keystroke_tracking": "Keystroke tracking",
+    "event_tracking": "Event tracking",
+    "arrhythmic_typing": "Arrhythmic typing",
+    "enable_model_answers": "Enable model answers",
+    "allow_student_resource_toggle": "Allow student resource toggle",
+    "allow_student_uploads": "Allow student uploads",
+}
+
+
+def _format_setting_value(field, value):
+    if value is None or value == "":
+        return "—"
+    if field == "viva_duration_seconds":
+        try:
+            minutes = int(value) // 60
+            return str(minutes)
+        except (TypeError, ValueError):
+            return str(value)
+    if field == "deadline_at":
+        try:
+            dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+            return dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            return str(value)
+    if isinstance(value, bool):
+        return "On" if value else "Off"
+    return str(value)
 
 def assignment_edit(request):
     roles = request.session.get("lti_roles", [])
@@ -59,6 +135,7 @@ def assignment_edit_save(request):
 
     resource_link_id = request.session.get("lti_resource_link_id")
     assignment = Assignment.objects.get(slug=resource_link_id)
+    snapshot_before = _collect_assignment_snapshot(assignment)
 
     # Basic text fields
     assignment.description = request.POST.get("description", assignment.description)
@@ -119,8 +196,23 @@ def assignment_edit_save(request):
     assignment.arrhythmic_typing = (request.POST.get("arrhythmic_typing") == "on")
     assignment.enable_model_answers = (request.POST.get("enable_model_answers") == "on")
     assignment.allow_student_resource_toggle = (request.POST.get("allow_student_resource_toggle") == "on")
+    assignment.allow_student_uploads = (request.POST.get("allow_student_uploads") == "on")
 
     assignment.save()
+
+    snapshot_after = _collect_assignment_snapshot(assignment)
+    changes = {}
+    for field in TRACKED_ASSIGNMENT_FIELDS:
+        before_val = snapshot_before.get(field)
+        after_val = snapshot_after.get(field)
+        if before_val != after_val:
+            changes[field] = {"from": before_val, "to": after_val}
+    if changes:
+        AssignmentSettingsChange.objects.create(
+            assignment=assignment,
+            changed_by=request.user if request.user.is_authenticated else None,
+            changes=changes,
+        )
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({"status": "ok"})
@@ -652,6 +744,7 @@ def assignment_view(request):
                             "sender": m.sender,
                             "text": m.text,
                             "timestamp": m.timestamp.isoformat(),
+                            "model_answer": m.model_answer if (m.sender or "").lower() == "ai" else "",
                         }
                         for m in msgs
                     ]
@@ -731,6 +824,7 @@ def assignment_view(request):
                 "title": assignment.title,
                 "id": assignment.id,
                 "slug": assignment.slug,
+                "enable_model_answers": bool(assignment.enable_model_answers),
             },
             "students": students,
             "stats": {
@@ -784,6 +878,26 @@ def assignment_view(request):
                     f'style="border:0;" title="MachinaViva self-enrol"></iframe>'
                 )
 
+        settings_history = []
+        history_qs = AssignmentSettingsChange.objects.filter(
+            assignment=assignment
+        ).select_related("changed_by")
+        for entry in history_qs:
+            items = []
+            for field in sorted(entry.changes.keys()):
+                change = entry.changes.get(field, {})
+                label = SETTING_LABELS.get(field, field.replace("_", " ").title())
+                items.append({
+                    "label": label,
+                    "from": _format_setting_value(field, change.get("from")),
+                    "to": _format_setting_value(field, change.get("to")),
+                })
+            settings_history.append({
+                "changed_at": entry.changed_at,
+                "changed_by": _format_feedback_author(entry.changed_by) or "System",
+                "items": items,
+            })
+
         return render(request, "tool/teacher_dashboard.html", {
             "assignment": assignment,
             "students": students,
@@ -799,6 +913,7 @@ def assignment_view(request):
             "self_enroll_link": self_enroll_link,
             "self_enroll_iframe": self_enroll_iframe,
             "invites": invites,
+            "settings_history": settings_history,
         })
 
     # --------------------------------------------------------------

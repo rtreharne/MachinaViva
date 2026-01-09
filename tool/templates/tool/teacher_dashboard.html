@@ -269,6 +269,7 @@
                             </div>
                             <div class="transcript-meta">
                                 <span class="transcript-duration" data-transcript-duration>Duration: —</span>
+                                <button class="control-btn ghost is-hidden" type="button" data-toggle-model>Show model answers</button>
                             </div>
                             <div class="transcript-chat" data-transcript-chat>
                                 <div class="bubble system">Select a student with a completed viva to view the transcript.</div>
@@ -378,109 +379,125 @@
                         </div>
                     </div>
                     <div class="settings-row">
-                        <label>Feedback visibility</label>
-                        <div class="tracking-table">
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Show AI feedback</div>
-                                    <div class="meta">AI feedback is visible to students.</div>
+                        <details class="settings-details">
+                            <summary>Feedback visibility</summary>
+                            <div class="tracking-table">
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Show AI feedback</div>
+                                        <div class="meta">AI feedback is visible to students.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="ai_feedback_visible" {% if assignment.ai_feedback_visible %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="ai_feedback_visible" {% if assignment.ai_feedback_visible %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Show teacher feedback</div>
-                                    <div class="meta">Teacher feedback is visible to students.</div>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Show teacher feedback</div>
+                                        <div class="meta">Teacher feedback is visible to students.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="teacher_feedback_visible" {% if assignment.teacher_feedback_visible %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="teacher_feedback_visible" {% if assignment.teacher_feedback_visible %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
                             </div>
-                        </div>
+                        </details>
                     </div>
                     <div class="settings-row">
-                        <label>Student report</label>
-                        <div class="tracking-table">
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Download feedback/transcript</div>
-                                    <div class="meta">Allow students to export their session.</div>
+                        <details class="settings-details">
+                            <summary>Student settings</summary>
+                            <div class="tracking-table">
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Download feedback/transcript</div>
+                                        <div class="meta">Allow students to export their session.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="allow_student_report" {% if assignment.allow_student_report %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="allow_student_report" {% if assignment.allow_student_report %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Allow early submission</div>
-                                    <div class="meta">Students can finish before the timer ends.</div>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Allow early submission</div>
+                                        <div class="meta">Students can finish before the timer ends.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="allow_early_submission" {% if assignment.allow_early_submission %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="allow_early_submission" {% if assignment.allow_early_submission %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Enable model answers</div>
-                                    <div class="meta">Show exemplar answers after completion.</div>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Enable model answers</div>
+                                        <div class="meta">Show exemplar answers after completion.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="enable_model_answers" {% if assignment.enable_model_answers %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="enable_model_answers" {% if assignment.enable_model_answers %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Allow students to toggle instructor files</div>
-                                    <div class="meta">Students must include at least one file.</div>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Allow students to toggle instructor files</div>
+                                        <div class="meta">Students must include at least one file.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="allow_student_resource_toggle" {% if assignment.allow_student_resource_toggle %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="allow_student_resource_toggle" {% if assignment.allow_student_resource_toggle %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Allow student uploads</div>
+                                        <div class="meta">Students can upload files to include in the viva context.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="allow_student_uploads" {% if assignment.allow_student_uploads %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        </details>
                     </div>
                     <div class="settings-row">
-                        <label>Tracking</label>
-                        <div class="tracking-table">
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Event tracking</div>
-                                    <div class="meta">Paste, blur/focus, window changes.</div>
+                        <details class="settings-details">
+                            <summary>Tracking</summary>
+                            <div class="tracking-table">
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Event tracking</div>
+                                        <div class="meta">Paste, blur/focus, window changes.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="event_tracking" {% if assignment.event_tracking %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="event_tracking" {% if assignment.event_tracking %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Keystroke tracking</div>
-                                    <div class="meta">Pacing signals.</div>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Keystroke tracking</div>
+                                        <div class="meta">Pacing signals.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="keystroke_tracking" {% if assignment.keystroke_tracking %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="keystroke_tracking" {% if assignment.keystroke_tracking %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="tracking-item">
-                                <div>
-                                    <div class="tracking-label">Arrhythmic typing</div>
-                                    <div class="meta">Flag irregular bursts.</div>
+                                <div class="tracking-item">
+                                    <div>
+                                        <div class="tracking-label">Arrhythmic typing</div>
+                                        <div class="meta">Flag irregular bursts.</div>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" name="arrhythmic_typing" {% if assignment.arrhythmic_typing %}checked{% endif %}>
+                                        <span class="slider"></span>
+                                    </label>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" name="arrhythmic_typing" {% if assignment.arrhythmic_typing %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
                             </div>
-                        </div>
+                        </details>
                     </div>
                 </div>
 
@@ -494,8 +511,8 @@
                     </div>
 
                     <div class="settings-row">
-                        <label for="additional_prompts">Additional prompts</label>
-                        <textarea id="additional_prompts" name="additional_prompts" rows="3" placeholder="Any bespoke prompts or discipline-specific instructions.">{{ assignment.additional_prompts }}</textarea>
+                        <label for="additional_prompts">Priority questions</label>
+                        <textarea id="additional_prompts" name="additional_prompts" rows="3" placeholder="Questions to prioritise early in the viva. One per line is best.">{{ assignment.additional_prompts }}</textarea>
                     </div>
 
                     <div class="settings-row">
@@ -565,6 +582,31 @@
                         </div>
                         <div class="meta upload-hint is-hidden" data-resource-upload-hint></div>
                     </div>
+                </div>
+
+                <div class="settings-form-card">
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Settings history</h3>
+                    </div>
+                    {% if settings_history %}
+                        <details class="history-details">
+                            <summary>View settings history</summary>
+                            <div class="settings-history">
+                                {% for entry in settings_history %}
+                                    <div class="history-entry">
+                                        <div class="meta">Changed {{ entry.changed_at|date:"Y-m-d H:i" }} · {{ entry.changed_by }}</div>
+                                        <ul class="history-list">
+                                            {% for item in entry.items %}
+                                                <li><span class="history-label">{{ item.label }}</span>: {{ item.from }} -> {{ item.to }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    {% else %}
+                        <div class="meta">No settings changes recorded yet.</div>
+                    {% endif %}
                 </div>
 
                 <div class="settings-actions">

@@ -122,10 +122,10 @@
         </div>
 
         <div class="settings-grid single-column">
-            <div class="settings-form-card" data-viva-summary-card>
-                <div class="settings-card-head">
-                    <h3 class="settings-title">Viva Dashboard</h3>
-                    <div class="meta attempts-left-meta" data-attempts-meta style="margin-top:4px;">
+                <div class="settings-form-card" data-viva-summary-card>
+                    <div class="settings-card-head">
+                        <h3 class="settings-title">Viva Dashboard</h3>
+                        <div class="meta attempts-left-meta" data-attempts-meta style="margin-top:4px;">
                         {% if attempts_left < 0 %}
                             Unlimited viva attempts
                         {% elif attempts_left > 0 %}
@@ -135,31 +135,33 @@
                         {% else %}
                             No viva attempts remaining
                         {% endif %}
+                        </div>
                     </div>
                     {% if latest_submission %}
-                        {% if viva_status == "in_progress" %}
-                            <button class="control-btn ghost"
-                                    type="button"
-                                    data-summary-cta
-                                    data-start-url="{% url 'viva_start' latest_submission.id %}"
-                                    data-cta-state="active">
-                                Return to viva
-                            </button>
-                        {% else %}
-                            {% if not deadline_passed %}
-                                {% if viva_status != "completed" or attempts_left|default:0 > 0 or assignment.max_attempts|default:0 <= 0 %}
-                                    <button class="control-btn ghost"
-                                            type="button"
-                                            data-summary-cta
-                                            data-start-url="{% url 'viva_start' latest_submission.id %}"
-                                            data-cta-state="ready">
-                                        Start Viva
-                                    </button>
+                        <div class="start-viva-row">
+                            {% if viva_status == "in_progress" %}
+                                <button class="control-btn primary start-viva-cta"
+                                        type="button"
+                                        data-summary-cta
+                                        data-start-url="{% url 'viva_start' latest_submission.id %}"
+                                        data-cta-state="active">
+                                    Return to viva
+                                </button>
+                            {% else %}
+                                {% if not deadline_passed %}
+                                    {% if viva_status != "completed" or attempts_left|default:0 > 0 or assignment.max_attempts|default:0 <= 0 %}
+                                        <button class="control-btn primary start-viva-cta"
+                                                type="button"
+                                                data-summary-cta
+                                                data-start-url="{% url 'viva_start' latest_submission.id %}"
+                                                data-cta-state="ready">
+                                            Start Viva
+                                        </button>
+                                    {% endif %}
                                 {% endif %}
                             {% endif %}
-                        {% endif %}
+                        </div>
                     {% endif %}
-                </div>
 
                 <div class="settings-row split">
                     <div>
@@ -254,74 +256,80 @@
                 </div>
                 {% endif %}
 
-                <div class="settings-row">
-                    <label>Your uploads</label>
-                    {% if submission_payloads %}
-                        <div class="submission-table-wrap" data-submission-list {% if session %}data-active-session="{{ session.id }}"{% endif %}>
-                            <div class="submission-table-header">
-                                <span>File</span>
-                                <span>Include</span>
-                                <span>Actions</span>
-                            </div>
-                            <div class="submission-table-body">
-                                {% for sub in submission_payloads %}
-                                    <div class="submission-row {% cycle 'row-alt' '' %}"
-                                         data-submission-id="{{ sub.id }}"
-                                         data-included="{{ sub.included|yesno:'1,0' }}"
-                                         data-file-name="{{ sub.file_name|cut:'submissions/'|cut:'submission/'|default:'uploaded file' }}"
-                                         data-comment="{{ sub.comment|default_if_none:''|escapejs }}"
-                                         data-file-size="{{ sub.file_size|default:0 }}"
-                                         data-start-url="{% url 'viva_start' sub.id %}">
-                                        <div class="submission-cell file-name">
-                                            <span class="file-name-text">
-                                                {{ sub.file_name|cut:"submissions/"|cut:"submission/"|default:"uploaded file"|truncatechars:40 }}
-                                            </span>
-                                            <a class="link file-preview file-chip-name-link"
-                                               href="#"
-                                               data-preview-text="{{ sub.comment|default_if_none:''|escapejs }}">
-                                                {{ sub.file_name|cut:"submissions/"|cut:"submission/"|default:"uploaded file"|truncatechars:40 }}
-                                            </a>
-                                            <div class="meta">
-                                                <a class="link file-preview preview-text-link"
+                {% if assignment.allow_student_uploads %}
+                    <div class="settings-row">
+                        <label>Your uploads</label>
+                        {% if submission_payloads %}
+                            <div class="submission-table-wrap" data-submission-list {% if session %}data-active-session="{{ session.id }}"{% endif %}>
+                                <div class="submission-table-header">
+                                    <span>File</span>
+                                    <span>Include</span>
+                                    <span>Actions</span>
+                                </div>
+                                <div class="submission-table-body">
+                                    {% for sub in submission_payloads %}
+                                        <div class="submission-row {% cycle 'row-alt' '' %}"
+                                             data-submission-id="{{ sub.id }}"
+                                             data-included="{{ sub.included|yesno:'1,0' }}"
+                                             data-file-name="{{ sub.file_name|cut:'submissions/'|cut:'submission/'|default:'uploaded file' }}"
+                                             data-comment="{{ sub.comment|default_if_none:''|escapejs }}"
+                                             data-file-size="{{ sub.file_size|default:0 }}"
+                                             data-start-url="{% url 'viva_start' sub.id %}">
+                                            <div class="submission-cell file-name">
+                                                <span class="file-name-text">
+                                                    {{ sub.file_name|cut:"submissions/"|cut:"submission/"|default:"uploaded file"|truncatechars:40 }}
+                                                </span>
+                                                <a class="link file-preview file-chip-name-link"
                                                    href="#"
                                                    data-preview-text="{{ sub.comment|default_if_none:''|escapejs }}">
-                                                    Preview text
+                                                    {{ sub.file_name|cut:"submissions/"|cut:"submission/"|default:"uploaded file"|truncatechars:40 }}
                                                 </a>
+                                                <div class="meta">
+                                                    <a class="link file-preview preview-text-link"
+                                                       href="#"
+                                                       data-preview-text="{{ sub.comment|default_if_none:''|escapejs }}">
+                                                        Preview text
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div class="submission-cell">
+                                                <label class="slider-toggle" aria-label="Include in viva">
+                                                    <input type="checkbox" data-toggle-include {% if sub.included %}checked{% endif %}>
+                                                    <span class="slider-track">
+                                                        <span class="slider-thumb"></span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                            <div class="submission-cell submission-actions">
+                                                {% if sub.can_delete %}
+                                                    <button class="icon-btn danger" type="button" data-delete-submission="{{ sub.id }}">Delete</button>
+                                                {% else %}
+                                                    <span class="meta muted">Linked to a viva</span>
+                                                {% endif %}
                                             </div>
                                         </div>
-                                        <div class="submission-cell">
-                                            <label class="slider-toggle" aria-label="Include in viva">
-                                                <input type="checkbox" data-toggle-include {% if sub.included %}checked{% endif %}>
-                                                <span class="slider-track">
-                                                    <span class="slider-thumb"></span>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div class="submission-cell submission-actions">
-                                            {% if sub.can_delete %}
-                                                <button class="icon-btn danger" type="button" data-delete-submission="{{ sub.id }}">Delete</button>
-                                            {% else %}
-                                                <span class="meta muted">Linked to a viva</span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                {% endfor %}
+                                    {% endfor %}
+                                </div>
                             </div>
-                        </div>
-                    {% else %}
-                        <div class="meta">No uploads yet. Add files below.</div>
-                    {% endif %}
-                </div>
+                        {% else %}
+                            <div class="meta">No uploads yet. Add files below.</div>
+                        {% endif %}
+                    </div>
+                {% endif %}
 
                 {% if attempts_left|default:0 > 0 or assignment.max_attempts|default:0 <= 0 %}
                     <div class="settings-row">
                         <label>Upload files</label>
-                        <form action="{% url 'submit_file' %}" method="POST" enctype="multipart/form-data" class="submission-form upload-inline" data-upload-form data-existing-count="{{ submission_payloads|length|default:0 }}" data-existing-size="{{ submissions_total_size|default:0 }}">
-                            {% csrf_token %}
-                            <input type="file" id="file" name="file" accept=".pdf,.docx,.txt,.py" multiple required>
-                            <button type="submit" class="control-btn">Upload</button>
-                        </form>
-                        <div class="meta upload-hint is-hidden" data-upload-hint></div>
+                        {% if assignment.allow_student_uploads %}
+                            <form action="{% url 'submit_file' %}" method="POST" enctype="multipart/form-data" class="submission-form upload-inline" data-upload-form data-existing-count="{{ submission_payloads|length|default:0 }}" data-existing-size="{{ submissions_total_size|default:0 }}">
+                                {% csrf_token %}
+                                <input type="file" id="file" name="file" accept=".pdf,.docx,.txt,.py" multiple required>
+                                <button type="submit" class="control-btn">Upload</button>
+                            </form>
+                            <div class="meta upload-hint is-hidden" data-upload-hint></div>
+                        {% else %}
+                            <div class="meta">Uploads are disabled for this assignment.</div>
+                        {% endif %}
                     </div>
                 {% endif %}
 

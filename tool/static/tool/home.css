@@ -1411,6 +1411,10 @@ a.link {
     margin-bottom: 8px;
 }
 
+.feedback-form [data-knowledge-flag-input] {
+    margin-bottom: 8px;
+}
+
 @media (max-width: 900px) {
     .transcript-layout {
         grid-template-columns: 1fr;
@@ -1585,11 +1589,51 @@ a.link {
     box-shadow: 0 10px 24px rgba(99, 102, 241, 0.25);
 }
 
+.start-viva-row {
+    margin-top: 10px;
+}
+
+.start-viva-cta {
+    width: 100%;
+    justify-content: center;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #db2777, #f472b6);
+    color: #fff5f8;
+    border-color: rgba(219, 39, 119, 0.7);
+    box-shadow: 0 10px 24px rgba(219, 39, 119, 0.35);
+    animation: throb 1.4s ease-in-out infinite;
+    transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+}
+
+.start-viva-cta:hover {
+    background: linear-gradient(135deg, #e11d87, #f472b6);
+}
+
+.start-viva-cta:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    animation: none;
+    box-shadow: none;
+}
+
+[data-theme="light"] .start-viva-cta {
+    color: #fff5f8;
+    box-shadow: 0 10px 24px rgba(219, 39, 119, 0.25);
+}
+
 .control-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.14);
+}
+
+.control-btn.start-viva-cta:hover {
+    background: linear-gradient(135deg, #38bdf8, #60a5fa);
+    border-color: rgba(56, 189, 248, 0.6);
+    box-shadow: 0 12px 26px rgba(56, 189, 248, 0.35);
 }
 
 .control-btn.ghost {
@@ -2949,6 +2993,12 @@ a.link {
     min-width: 0;
 }
 
+@media (max-width: 900px) {
+    .viva-history-layout.show-feedback {
+        grid-template-columns: 1fr;
+    }
+}
+
 .viva-chat-head {
     display: flex;
     align-items: center;
@@ -3261,6 +3311,69 @@ a.link {
     gap: 10px;
     flex-wrap: wrap;
     align-items: center;
+}
+
+.settings-history {
+    display: grid;
+    gap: 12px;
+}
+
+.history-entry .meta {
+    margin-bottom: 6px;
+}
+
+.history-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.history-label {
+    font-weight: 700;
+}
+
+.history-details summary {
+    cursor: pointer;
+    list-style: none;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.history-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.history-details summary::after {
+    content: "▾";
+    margin-left: 8px;
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+.history-details[open] summary::after {
+    content: "▴";
+}
+
+.settings-details summary {
+    cursor: pointer;
+    list-style: none;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 8px;
+}
+
+.settings-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-details summary::after {
+    content: "▾";
+    margin-left: 8px;
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+.settings-details[open] summary::after {
+    content: "▴";
 }
 
 .settings-actions .view-btn {

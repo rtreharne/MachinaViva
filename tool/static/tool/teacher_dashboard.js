@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const transcriptEvents = document.querySelector("[data-transcript-events]");
     const transcriptDuration = document.querySelector("[data-transcript-duration]");
     const transcriptFiles = document.querySelector("[data-transcript-files]");
+    const modelToggleBtn = document.querySelector("[data-toggle-model]");
     const aiFeedbackEl = document.querySelector("[data-ai-feedback]");
     const teacherFeedbackForm = document.querySelector("[data-teacher-feedback-form]");
     const teacherFeedbackInput = document.querySelector("[data-teacher-feedback-input]");
@@ -64,6 +65,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeStudent = null;
     let activeFeedbackSessionId = null;
     let activeKnowledgeFlagSessionId = null;
+    let showModelAnswers = false;
+    const modelAnswersEnabled = !!data?.assignment?.enable_model_answers;
     if (attemptSelect) attemptSelect.disabled = true;
 
     const showPane = (target) => {
@@ -441,6 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 sender: msg.sender,
                 text: msg.text,
                 timestamp: msg.timestamp,
+                model_answer: msg.model_answer || "",
             });
         });
         buildEventTimeline(events).forEach(evt => {
@@ -468,8 +472,28 @@ document.addEventListener("DOMContentLoaded", () => {
         ordered.forEach(item => {
             const bubble = document.createElement("div");
             if (item.kind === "message") {
-                bubble.className = `bubble ${item.sender === "ai" ? "ai" : "user"}`;
-                bubble.textContent = item.text;
+                const isAi = item.sender === "ai";
+                bubble.className = `bubble ${isAi ? "ai" : "user"}`;
+                const content = document.createElement("div");
+                content.className = "bubble-text";
+                content.textContent = item.text;
+                bubble.appendChild(content);
+                if (isAi && item.model_answer) {
+                    bubble.dataset.modelAnswer = item.model_answer;
+                    if (showModelAnswers) {
+                        const modelBlock = document.createElement("div");
+                        modelBlock.className = "model-answer";
+                        const label = document.createElement("span");
+                        label.className = "model-answer-label";
+                        label.textContent = "Model answer:";
+                        const value = document.createElement("span");
+                        value.className = "model-answer-text";
+                        value.textContent = item.model_answer;
+                        modelBlock.appendChild(label);
+                        modelBlock.appendChild(value);
+                        bubble.appendChild(modelBlock);
+                    }
+                }
             } else {
                 bubble.className = "bubble system";
                 bubble.textContent = item.label || "Event recorded.";
@@ -484,6 +508,11 @@ document.addEventListener("DOMContentLoaded", () => {
             transcriptChat.appendChild(bubble);
         });
         transcriptChat.scrollTop = 0;
+    };
+
+    const attemptHasModelAnswers = (attempt) => {
+        const messages = attempt?.messages || [];
+        return messages.some((msg) => (msg.model_answer || "").trim());
     };
 
     const renderFiles = (files = []) => {
@@ -675,6 +704,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (knowledgeFlagStatus) knowledgeFlagStatus.textContent = "";
             activeKnowledgeFlagSessionId = null;
+            if (modelToggleBtn) {
+                modelToggleBtn.classList.add("is-hidden");
+                modelToggleBtn.disabled = true;
+            }
             if (transcriptDuration) transcriptDuration.textContent = "Duration: —";
             if (transcriptStatus) transcriptStatus.textContent = "Pending";
             return;
@@ -685,6 +718,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const attempt = attempts.find(a => String(a.session_id) === String(targetId)) || defaultAttempt || attempts[0];
         if (attemptSelect) attemptSelect.value = attempt.session_id;
 
+        const canShowModelAnswers = modelAnswersEnabled && attemptHasModelAnswers(attempt);
+        if (!canShowModelAnswers) {
+            showModelAnswers = false;
+        }
+        if (modelToggleBtn) {
+            modelToggleBtn.classList.toggle("is-hidden", !canShowModelAnswers);
+            modelToggleBtn.disabled = !canShowModelAnswers;
+            modelToggleBtn.textContent = showModelAnswers ? "Hide model answers" : "Show model answers";
+        }
         renderTranscriptTimeline(attempt.messages || [], attempt.events || []);
         renderFlags(attempt.flags || []);
         renderFeedback(attempt.feedback, attempt.session_id);
@@ -910,6 +952,16 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!activeStudent) return;
             renderTranscript(activeStudent, e.target.value);
             setDashboardControlsVisible(false);
+        });
+    }
+
+    if (modelToggleBtn) {
+        modelToggleBtn.addEventListener("click", () => {
+            showModelAnswers = !showModelAnswers;
+            modelToggleBtn.textContent = showModelAnswers ? "Hide model answers" : "Show model answers";
+            if (activeStudent) {
+                renderTranscript(activeStudent, attemptSelect?.value || null);
+            }
         });
     }
 

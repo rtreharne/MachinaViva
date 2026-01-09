@@ -79,6 +79,7 @@ class Assignment(models.Model):
     arrhythmic_typing = models.BooleanField(default=True)
     enable_model_answers = models.BooleanField(default=True)
     allow_student_resource_toggle = models.BooleanField(default=False)
+    allow_student_uploads = models.BooleanField(default=True)
     self_enroll_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     self_enroll_domain = models.CharField(max_length=255, blank=True, default="")
 
@@ -218,7 +219,6 @@ class ToolConfig(models.Model):
     Behaviour will be added later.
     """
     platform = models.CharField(max_length=255, default="Canvas", unique=True)
-
     issuer = models.CharField(max_length=255)
     jwks_url = models.URLField()
     authorize_url = models.URLField()
@@ -234,6 +234,26 @@ class ToolConfig(models.Model):
     def __str__(self):
         return f"{self.platform} configuration"
     
+
+class AssignmentSettingsChange(models.Model):
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.CASCADE,
+        related_name="settings_changes",
+    )
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assignment_settings_changes",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+    changes = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ["-changed_at"]
+
 
 class VivaFeedback(models.Model):
     """
